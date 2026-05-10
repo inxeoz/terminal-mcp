@@ -148,15 +148,36 @@ class SessionManager:
         return list(active.values())
 
     def status(self, name: str) -> dict:
-        session = self.get(name)
-        cwd = session.get_cwd()
+        session = self._sessions.get(name)
+        if session:
+            cwd = session.get_cwd()
+            return {
+                "id": session.id,
+                "alive": session.alive,
+                "pid": session.get_pid(),
+                "cwd": cwd,
+                "created_at": session.created_at.isoformat(),
+                "last_activity": session.updated_at.isoformat(),
+            }
+
+        row = self._db.execute(
+            "SELECT timestamp FROM events WHERE terminal_id = ? ORDER BY id ASC LIMIT 1",
+            (name,),
+        ).fetchone()
+        if not row:
+            raise KeyError(f"Terminal '{name}' not found")
+
+        last_row = self._db.execute(
+            "SELECT timestamp FROM events WHERE terminal_id = ? ORDER BY id DESC LIMIT 1",
+            (name,),
+        ).fetchone()
         return {
-            "id": session.id,
-            "alive": session.alive,
-            "pid": session.get_pid(),
-            "cwd": cwd,
-            "created_at": session.created_at.isoformat(),
-            "last_activity": session.updated_at.isoformat(),
+            "id": name,
+            "alive": False,
+            "pid": None,
+            "cwd": None,
+            "created_at": row[0],
+            "last_activity": last_row[0] if last_row else row[0],
         }
 
     def send(self, name: str, text: str) -> None:

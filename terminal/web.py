@@ -25,6 +25,12 @@ body{background:#0d1117;color:#c9d1d9;font-family:monospace;display:flex;height:
 #info{padding:10px 16px;border-bottom:1px solid #30363d;font-size:12px;display:flex;gap:20px;flex-shrink:0;flex-wrap:wrap}
 #info span{color:#8b949e}
 #info strong{color:#c9d1d9;margin-left:4px}
+#toolbar{padding:8px 12px;border-bottom:1px solid #30363d;display:flex;gap:8px;align-items:center;flex-shrink:0;background:#11151b}
+#history-search{flex:1;background:#0d1117;border:1px solid #30363d;color:#c9d1d9;font-family:monospace;font-size:12px;padding:7px 10px;border-radius:4px;outline:none}
+#history-search:focus{border-color:#58a6ff}
+#history-clear{background:#21262d;border:1px solid #30363d;color:#c9d1d9;font-family:monospace;font-size:12px;padding:7px 10px;border-radius:4px;cursor:pointer}
+#history-clear:hover{background:#30363d}
+#history-count{color:#8b949e;font-size:11px;min-width:84px;text-align:right}
 #history{flex:1;overflow-y:auto;padding:8px 12px}
 .entry{padding:6px 8px;margin:2px 0;border-radius:4px;font-size:12px;display:flex;gap:10px}
 .entry.input{border-left:2px solid #58a6ff}
@@ -51,10 +57,15 @@ body{background:#0d1117;color:#c9d1d9;font-family:monospace;display:flex;height:
 </div>
 <div id="main">
 <div id="info">
-<span>ID: <strong id="info-id">-</strong></span>
-<span>PID: <strong id="info-pid">-</strong></span>
-<span>Alive: <strong id="info-alive">-</strong></span>
-<span>CWD: <strong id="info-cwd">-</strong></span>
+  <span>ID: <strong id="info-id">-</strong></span>
+  <span>PID: <strong id="info-pid">-</strong></span>
+  <span>Alive: <strong id="info-alive">-</strong></span>
+  <span>CWD: <strong id="info-cwd">-</strong></span>
+</div>
+<div id="toolbar">
+  <input id="history-search" placeholder="Filter history...">
+  <button id="history-clear" type="button">Clear</button>
+  <span id="history-count"></span>
 </div>
 <div id="history">
 <div id="empty">Select a terminal from the sidebar</div>
@@ -65,7 +76,18 @@ body{background:#0d1117;color:#c9d1d9;font-family:monospace;display:flex;height:
 </div>
 <script>
 const $=id=>document.getElementById(id);
-let activeId=null,timer=null,statusTimer=null,cursor=0;
+let activeId=null,timer=null,statusTimer=null,cursor=0,historyFilter='';
+
+function applyHistoryFilter(){
+  const entries=$('history').querySelectorAll('.entry');
+  let visible=0;
+  for(const entry of entries){
+    const match=!historyFilter || entry.textContent.toLowerCase().includes(historyFilter);
+    entry.style.display=match?'flex':'none';
+    if(match) visible++;
+  }
+  $('history-count').textContent=historyFilter?`${visible}/${entries.length}`:(entries.length?`${entries.length} total`:'');
+}
 
 async function refreshList(){
   const r=await fetch('/api/terminals'),data=await r.json();
@@ -78,11 +100,13 @@ async function refreshList(){
 }
 
 async function select(id){
-  activeId=id; cursor=0;
+  activeId=id; cursor=0; historyFilter='';
   if(timer)clearInterval(timer);
   if(statusTimer)clearInterval(statusTimer);
   $('empty').style.display='none';
   $('history').innerHTML='';
+  $('history-search').value='';
+  $('history-count').textContent='';
   $('input-bar').style.display='block';
   $('cmd-input').focus();
   refreshList();
@@ -112,6 +136,7 @@ async function loadHistory(){
       div.innerHTML='<span class="ts">'+e.timestamp.slice(11,19)+'</span><span class="tag '+(e.type=='input'?'in':'out')+'">'+(e.type=='input'?'IN':'OUT')+'</span><span class="txt '+(e.type=='input'?'in':'out')+'">'+txt+'</span>';
       $('history').appendChild(div);
     }
+    applyHistoryFilter();
     if(d.events.length){cursor=d.cursor;$('history').scrollTop=$('history').scrollHeight}
   }catch(e){}
 }
@@ -125,6 +150,8 @@ async function sendCmd(){
   }catch(e){}
 }
 function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+$('history-search').oninput=function(e){historyFilter=e.target.value.trim().toLowerCase();applyHistoryFilter()};
+$('history-clear').onclick=function(){historyFilter='';$('history-search').value='';applyHistoryFilter();$('cmd-input').focus()};
 $('cmd-input').onkeydown=function(e){if(e.key==='Enter'){e.preventDefault();sendCmd()}};
 setInterval(refreshList,2000);
 refreshList();
