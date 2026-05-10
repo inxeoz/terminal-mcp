@@ -92,6 +92,9 @@ class SessionManager:
         return {"events": events, "cursor": latest}
 
     async def create(self, name: str) -> TerminalSession:
+        name = name.strip()
+        if not name:
+            raise ValueError("Terminal name cannot be empty")
         if name in self._sessions:
             raise ValueError(f"Terminal '{name}' already exists")
 
@@ -210,9 +213,17 @@ class SessionManager:
         return {"matched": False, "cursor": session.cursor}
 
     def search(self, name: str, query: str) -> dict:
-        session = self.get(name)
-        matches = session.search_output(query)
-        return {"matches": matches}
+        session = self._sessions.get(name)
+        if session:
+            return {"matches": session.search_output(query)}
+
+        rows = self._db.execute(
+            "SELECT text FROM events WHERE terminal_id = ? AND LOWER(text) LIKE ? ORDER BY id",
+            (name, f"%{query.lower()}%"),
+        ).fetchall()
+        if not rows:
+            raise KeyError(f"Terminal '{name}' not found")
+        return {"matches": [row[0].strip() for row in rows if row[0].strip()]}
 
     async def kill(self, name: str) -> None:
         session = self.get(name)

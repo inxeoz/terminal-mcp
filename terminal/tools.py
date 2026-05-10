@@ -7,7 +7,7 @@ TOOLS = [
         inputSchema={
             "type": "object",
             "properties": {
-                "name": {"type": "string", "description": "Unique name for the terminal"}
+                "name": {"type": "string", "minLength": 1, "description": "Unique name for the terminal"}
             },
             "required": ["name"],
         },
