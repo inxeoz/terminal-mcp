@@ -35,7 +35,7 @@ TOOLS = [
             "type": "object",
             "properties": {
                 "terminal_id": {"type": "string", "description": "Terminal ID"},
-                "text": {"type": "string", "description": "Text to send (include newline for commands)"},
+                "text": {"type": "string", "description": "Text to send (newline optional for commands)"},
             },
             "required": ["terminal_id", "text"],
         },

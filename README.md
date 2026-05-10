@@ -51,7 +51,7 @@ i4z-terminal-mcp
 | `create_terminal` | Spawn a persistent bash shell |
 | `list_terminals` | List all active sessions |
 | `terminal_status` | Get PID, CWD, alive, timestamps |
-| `send_input` | Write text/commands to stdin |
+| `send_input` | Write text/commands to stdin (newline optional) |
 | `read_output` | Incremental read via cursor |
 | `send_signal` | Send SIGINT/SIGTERM/SIGKILL |
 | `kill_terminal` | Destroy session and free resources |

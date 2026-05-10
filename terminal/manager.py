@@ -146,7 +146,8 @@ class SessionManager:
         session = self.get(name)
         if not session.alive:
             raise RuntimeError(f"Terminal '{name}' is dead")
-        session.shell.send(text)
+        send_text = text if text.endswith(("\n", "\r")) else text + "\n"
+        session.shell.send(send_text)
         self._record(name, "input", text)
         session.updated_at = datetime.now(timezone.utc)
 
