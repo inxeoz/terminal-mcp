@@ -1,4 +1,4 @@
-# Multi-Terminal MCP Server
+# i4z-terminal-mcp
 
 MCP server that enables AI agents to manage multiple persistent terminal sessions concurrently.
 
@@ -14,9 +14,9 @@ MCP server that enables AI agents to manage multiple persistent terminal session
 ## Install
 
 ```bash
-uv tool install terminal-mcp
+uv tool install i4z-terminal-mcp
 # or
-pip install terminal-mcp
+pip install i4z-terminal-mcp
 # or from source
 uv pip install -e .
 ```
@@ -30,7 +30,7 @@ With OpenCode, add to `opencode.json`:
   "mcp": {
     "terminal": {
       "type": "local",
-      "command": ["uv", "x", "terminal-mcp"],
+      "command": ["uvx", "i4z-terminal-mcp"],
       "enabled": true
     }
   }
@@ -40,7 +40,7 @@ With OpenCode, add to `opencode.json`:
 Or directly:
 
 ```bash
-terminal-mcp
+i4z-terminal-mcp
 ```
 
 ## Tools

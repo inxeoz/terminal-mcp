@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "terminal-mcp"
+name = "i4z-terminal-mcp"
 version = "0.1.0"
 description = "MCP server for persistent interactive terminal orchestration"
 license = "MIT"
@@ -15,7 +15,7 @@ dependencies = [
 ]
 
 [project.scripts]
-terminal-mcp = "mcp_server:main"
+i4z-terminal-mcp = "mcp_server:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["terminal"]

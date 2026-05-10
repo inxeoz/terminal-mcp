@@ -8,7 +8,7 @@ from mcp.types import Tool, TextContent
 from terminal.manager import SessionManager
 from terminal.tools import TOOLS
 
-app = Server("multi-terminal-mcp")
+app = Server("i4z-terminal-mcp")
 manager = SessionManager()
 
 

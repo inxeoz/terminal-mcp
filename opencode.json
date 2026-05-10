@@ -3,7 +3,7 @@
   "mcp": {
     "terminal": {
       "type": "local",
-      "command": [".venv/bin/python", "mcp_server.py"],
+      "command": ["i4z-terminal-mcp"],
       "enabled": true
     }
   }
