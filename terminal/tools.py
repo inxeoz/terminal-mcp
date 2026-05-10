@@ -105,4 +105,9 @@ TOOLS = [
             "required": ["terminal_id", "query"],
         },
     ),
+    Tool(
+        name="web_url",
+        description="Get the web UI URL where terminal sessions can be viewed in a browser",
+        inputSchema={"type": "object", "properties": {}},
+    ),
 ]

@@ -10,6 +10,7 @@ MCP server that enables AI agents to manage multiple persistent terminal session
 - Incremental cursor-based output reads
 - Pattern-based output waiting
 - Signal support (SIGINT, SIGTERM, SIGKILL)
+- **Web UI** — view terminals live at `http://127.0.0.1:9020` (xterm.js)
 
 ## Install
 

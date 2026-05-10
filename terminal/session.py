@@ -1,6 +1,7 @@
 import asyncio
 import os
 from collections import deque
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
@@ -17,6 +18,7 @@ class TerminalSession:
     cursor: int = 0
     alive: bool = True
     reader_task: asyncio.Task | None = None
+    on_output: Callable[[str], None] | None = None
 
     def append_output(self, text: str) -> None:
         if not text:
@@ -25,6 +27,8 @@ class TerminalSession:
         self.output_buffer.append(entry)
         self.cursor += len(text)
         self.updated_at = datetime.now(timezone.utc)
+        if self.on_output:
+            self.on_output(text)
 
     def read_since(self, since: int, max_bytes: int | None = None) -> tuple[str, int]:
         chunks: list[str] = []
