@@ -1,5 +1,7 @@
 import asyncio
 import json
+import signal
+import sys
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
@@ -73,10 +75,42 @@ async def _handle_tool(name: str, args: dict) -> dict:
 
 
 def main():
-    asyncio.run(_main())
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    _shutdown_requested = False
+
+    def _on_signal():
+        nonlocal _shutdown_requested
+        if _shutdown_requested:
+            print("\nForced exit", file=sys.stderr)
+            loop.call_soon_threadsafe(lambda: sys.exit(1))
+            return
+        _shutdown_requested = True
+        print("\nShutting down... (Ctrl+D to stop)", file=sys.stderr)
+        for task in asyncio.all_tasks(loop):
+            task.cancel()
+
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        try:
+            loop.add_signal_handler(sig, _on_signal)
+        except NotImplementedError:
+            pass
+
+    try:
+        loop.run_until_complete(_main())
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        pass
+    finally:
+        try:
+            loop.run_until_complete(manager.shutdown())
+        except Exception:
+            pass
+        loop.close()
+        print("i4z-terminal-mcp stopped", file=sys.stderr)
 
 
 async def _main():
+    print("i4z-terminal-mcp running (Ctrl+D to stop)", file=sys.stderr)
     async with stdio_server() as (read, write):
         await app.run(read, write, app.create_initialization_options())
 
