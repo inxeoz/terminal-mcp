@@ -147,7 +147,18 @@ function setTheme(next){
   const theme=next==='light'?'light':'dark';
   document.body.dataset.theme=theme;
   localStorage.setItem('i4z-terminal-theme', theme);
-  $('theme-toggle').textContent='Theme: '+theme;
+  const toggle=$('theme-toggle');
+  if(toggle) toggle.textContent='Theme: '+theme;
+}
+
+function setDisplay(id, value){
+  const el=$(id);
+  if(el) el.style.display=value;
+}
+
+function setText(id, value){
+  const el=$(id);
+  if(el) el.textContent=value;
 }
 
 function applyHistoryFilter(){
@@ -175,15 +186,15 @@ async function select(id){
   activeId=id; cursor=0; historyFilter='';
   if(timer)clearInterval(timer);
   if(statusTimer)clearInterval(statusTimer);
-  $('empty').style.display='none';
+  setDisplay('empty', 'none');
   $('history').innerHTML='';
   $('history-search').value='';
   $('history-count').textContent='';
   $('output-search').value='';
-  $('search-results').style.display='none';
-  $('search-results-body').innerHTML='';
-  $('search-results-count').textContent='';
-  $('input-bar').style.display='block';
+  setDisplay('search-results', 'none');
+  setText('search-results-body', '');
+  setText('search-results-count', '');
+  setDisplay('input-bar', 'block');
   $('cmd-input').focus();
   refreshList();
   await loadStatus();
@@ -244,8 +255,8 @@ async function deleteSession(){
     if(timer)clearInterval(timer);
     if(statusTimer)clearInterval(statusTimer);
     $('history').innerHTML='';
-    $('empty').style.display='flex';
-    $('input-bar').style.display='none';
+    setDisplay('empty', 'flex');
+    setDisplay('input-bar', 'none');
     $('cmd-input').disabled=true;
     $('delete-terminal').disabled=true;
     $('info-id').textContent='-';
@@ -269,9 +280,9 @@ async function sendCmd(){
 async function searchOutput(){
   const query=$('output-search').value.trim();
   if(!activeId||!query){
-    $('search-results').style.display='none';
-    $('search-results-body').innerHTML='';
-    $('search-results-count').textContent='';
+    setDisplay('search-results', 'none');
+    setText('search-results-body', '');
+    setText('search-results-count', '');
     return;
   }
   try{
@@ -279,8 +290,8 @@ async function searchOutput(){
     const d=await r.json();
     if(!r.ok)throw new Error(d.error||'search failed');
     const matches=d.matches||[];
-    $('search-results').style.display='block';
-    $('search-results-count').textContent=matches.length?`${matches.length} match${matches.length===1?'':'es'}`:'0 matches';
+    setDisplay('search-results', 'block');
+    setText('search-results-count', matches.length?`${matches.length} match${matches.length===1?'':'es'}`:'0 matches');
     $('search-results-body').innerHTML=matches.length?matches.map(m=>`<div class="search-match">${esc(m)}</div>`).join(''):'<div class="search-empty">No matches</div>';
   }catch(e){
     alert(e.message||'search failed');
