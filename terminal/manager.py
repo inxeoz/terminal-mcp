@@ -95,7 +95,24 @@ class SessionManager:
         if name in self._sessions:
             raise ValueError(f"Terminal '{name}' already exists")
 
-        shell = pexpect.spawn("/bin/bash", encoding="utf-8", codec_errors="replace")
+        env = os.environ.copy()
+        env.update(
+            {
+                "TERM": "dumb",
+                "NO_COLOR": "1",
+                "CLICOLOR": "0",
+                "LS_COLORS": "",
+                "PS1": "$ ",
+                "PROMPT_COMMAND": "",
+            }
+        )
+        shell = pexpect.spawn(
+            "/bin/bash",
+            ["--noprofile", "--norc"],
+            encoding="utf-8",
+            codec_errors="replace",
+            env=env,
+        )
         shell.setwinsize(24, 80)
 
         session = TerminalSession(id=name, shell=shell)
