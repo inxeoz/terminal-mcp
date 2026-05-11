@@ -30,7 +30,7 @@ AI Agent (OpenCode, MCP Inspector, etc.)
 │                                     │
 │  ┌─ SessionManager ───────────────┐ │
 │  │  TerminalSession registry      │ │
-│  │  SQLite history (per-process)  │ │
+│  │  HistoryStore adapter          │ │
 │  │  Output buffer (cursor model)  │ │
 │  └────────────────────────────────┘ │
 │                                     │
@@ -59,7 +59,8 @@ i4z-terminal-mcp/
 │   ├── __init__.py
 │   ├── server.py       # MCP server entry point, CLI main()
 │   ├── tools.py        # 10 MCP tool definitions (JSON Schema)
-│   ├── manager.py      # SessionManager: lifecycle, SQLite, history
+│   ├── manager.py      # SessionManager: lifecycle, delegation
+│   ├── history.py      # HistoryStore: SQLite events/history/search
 │   ├── session.py      # TerminalSession: PTY shell, output buffer, cursor
 │   ├── reader.py       # Background asyncio reader loop (50ms poll)
 │   ├── signals.py      # SIGINT/SIGTERM/SIGKILL dispatch

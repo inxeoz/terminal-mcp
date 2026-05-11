@@ -56,6 +56,9 @@ class TerminalSession:
                     matches.append(line.strip())
         return matches
 
+    def output_text(self) -> str:
+        return "".join(text for _, text in self.output_buffer)
+
     def get_pid(self) -> int | None:
         try:
             return self.shell.pid
