@@ -1,5 +1,6 @@
 import asyncio
 import os
+import re
 import shlex
 import time
 from datetime import datetime, timezone
@@ -11,6 +12,21 @@ from .log import log
 from .reader import reader_loop
 from .session import TerminalSession
 from .signals import send_signal
+
+_ROUTE_SAFE_ID_RE = re.compile(r"^[^\x00-\x1f\x7f/\\]+$")
+_ENV_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def _validate_route_id(value: str, label: str) -> None:
+    if not value:
+        raise ValueError(f"{label} cannot be empty")
+    if not _ROUTE_SAFE_ID_RE.fullmatch(value):
+        raise ValueError(f"{label} cannot contain path separators or control characters")
+
+
+def _validate_env_key(key: str) -> None:
+    if not _ENV_KEY_RE.fullmatch(key):
+        raise ValueError(f"Invalid environment variable name: {key!r}")
 
 
 class SessionManager:
@@ -40,6 +56,7 @@ class SessionManager:
         env: dict[str, str] | None = None,
         startup_commands: list[str] | None = None,
     ) -> dict:
+        _validate_route_id(workspace_id, "Workspace id")
         return self._history.create_workspace(workspace_id, env, startup_commands)
 
     def configure_workspace(
@@ -50,12 +67,16 @@ class SessionManager:
         startup_commands: list[str] | None = None,
         apply_to_members: bool = True,
     ) -> dict:
+        _validate_route_id(workspace_id, "Workspace id")
         workspace = self._history.get_workspace(workspace_id)
         env = dict(workspace["env"])
         if set_env:
+            for key in set_env:
+                _validate_env_key(key)
             env.update(set_env)
         if unset_env:
             for key in unset_env:
+                _validate_env_key(key)
                 env.pop(key, None)
         commands = list(workspace["startup_commands"])
         if startup_commands is not None:
@@ -105,10 +126,11 @@ class SessionManager:
         run_startup_commands: bool = True,
     ) -> TerminalSession:
         name = name.strip()
-        if not name:
-            raise ValueError("Terminal name cannot be empty")
+        _validate_route_id(name, "Terminal name")
         if name in self._sessions:
             raise ValueError(f"Terminal '{name}' already exists")
+        if workspace_id:
+            _validate_route_id(workspace_id, "Workspace id")
 
         profile = self._history.get_session_profile(name)
         workspace_profile = {"env": {}, "startup_commands": []}
@@ -238,6 +260,7 @@ class SessionManager:
 
     def set_env(self, name: str, key: str, value: str) -> dict:
         session = self.get(name)
+        _validate_env_key(key)
         self._history.set_session_env(name, key, value)
         session.shell.sendline(f"export {key}={shlex.quote(value)}")
         session.updated_at = datetime.now(timezone.utc)
@@ -245,6 +268,7 @@ class SessionManager:
 
     def unset_env(self, name: str, key: str) -> dict:
         session = self.get(name)
+        _validate_env_key(key)
         self._history.unset_session_env(name, key)
         session.shell.sendline(f"unset {key}")
         session.updated_at = datetime.now(timezone.utc)

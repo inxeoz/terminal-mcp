@@ -8,10 +8,16 @@ from datetime import datetime, timezone
 from .log import log
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[a-zA-Z]|\x1b\][^\x07]*\x07")
+_ENV_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 def _strip_ansi(text: str) -> str:
     return _ANSI_RE.sub("", text).replace("\r", "")
+
+
+def _validate_env_key(key: str) -> None:
+    if not _ENV_KEY_RE.fullmatch(key):
+        raise ValueError(f"Invalid environment variable name: {key!r}")
 
 
 def _db_path() -> str:
@@ -222,6 +228,7 @@ class HistoryStore:
         }
 
     def set_session_env(self, terminal_id: str, key: str, value: str) -> dict:
+        _validate_env_key(key)
         profile = self.get_session_profile(terminal_id)
         env = dict(profile["env"])
         env[key] = value
@@ -229,6 +236,7 @@ class HistoryStore:
         return self.get_session_profile(terminal_id)
 
     def unset_session_env(self, terminal_id: str, key: str) -> dict:
+        _validate_env_key(key)
         profile = self.get_session_profile(terminal_id)
         env = dict(profile["env"])
         env.pop(key, None)
@@ -468,6 +476,8 @@ class HistoryStore:
     def create_workspace(self, workspace_id: str, env: dict[str, str] | None = None, startup_commands: list[str] | None = None) -> dict:
         if self._db.execute("SELECT 1 FROM workspaces WHERE id = ?", (workspace_id,)).fetchone():
             raise ValueError(f"Workspace '{workspace_id}' already exists")
+        for key in (env or {}).keys():
+            _validate_env_key(key)
         env_json = json.dumps(env or {}, sort_keys=True)
         startup_json = json.dumps(startup_commands or [])
         now = self._now()
@@ -515,6 +525,8 @@ class HistoryStore:
         ]
 
     def update_workspace(self, workspace_id: str, env: dict[str, str], startup_commands: list[str]) -> dict:
+        for key in env.keys():
+            _validate_env_key(key)
         now = self._now()
         cur = self._db.execute(
             "UPDATE workspaces SET env_json = ?, startup_json = ?, updated_at = ? WHERE id = ?",

@@ -20,6 +20,7 @@ class TerminalSession:
     reader_task: asyncio.Task | None = None
     on_output: Callable[[str], None] | None = None
     on_error: Callable[[str], None] | None = None
+    output_listeners: list[Callable[[str], None]] = field(default_factory=list)
 
     def append_output(self, text: str) -> None:
         if not text:
@@ -30,10 +31,23 @@ class TerminalSession:
         self.updated_at = datetime.now(timezone.utc)
         if self.on_output:
             self.on_output(text)
+        for listener in list(self.output_listeners):
+            listener(text)
+
+    def add_output_listener(self, listener: Callable[[str], None]) -> None:
+        if listener not in self.output_listeners:
+            self.output_listeners.append(listener)
+
+    def remove_output_listener(self, listener: Callable[[str], None]) -> None:
+        try:
+            self.output_listeners.remove(listener)
+        except ValueError:
+            pass
 
     def read_since(self, since: int, max_bytes: int | None = None) -> tuple[str, int]:
         chunks: list[str] = []
         total = 0
+        next_cursor = since
         for offset, text in self.output_buffer:
             if offset + len(text) <= since:
                 continue
@@ -42,12 +56,15 @@ class TerminalSession:
             if max_bytes is not None and total + len(chunk) > max_bytes:
                 remaining = max_bytes - total
                 if remaining > 0:
-                    chunks.append(chunk[:remaining])
+                    piece = chunk[:remaining]
+                    chunks.append(piece)
+                    next_cursor = offset + start + len(piece)
                 break
             chunks.append(chunk)
             total += len(chunk)
+            next_cursor = offset + start + len(chunk)
         output = "".join(chunks)
-        return output, self.cursor
+        return output, next_cursor
 
     def search_output(self, query: str) -> list[str]:
         matches: list[str] = []

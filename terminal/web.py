@@ -1,7 +1,10 @@
+import asyncio
+
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse
-from starlette.routing import Route
+from starlette.routing import Route, WebSocketRoute
+from starlette.websockets import WebSocket, WebSocketDisconnect
 
 HTML = """<!doctype html>
 <html lang="en">
@@ -166,7 +169,7 @@ body{background:var(--bg);color:var(--fg);font-family:monospace;display:flex;hei
     <textarea id="workspace-startup" placeholder="workspace startup commands, one per line"></textarea>
     <div class="row">
       <select id="workspace-list" style="flex:1;min-width:130px"></select>
-      <button id="workspace-apply-btn" type="button">Apply</button>
+      <button id="workspace-apply-btn" type="button">Save &amp; Apply</button>
       <button id="workspace-add-member-btn" type="button">Add member</button>
       <button id="workspace-remove-member-btn" type="button">Remove member</button>
     </div>
@@ -227,7 +230,7 @@ body{background:var(--bg);color:var(--fg);font-family:monospace;display:flex;hei
 </div>
 <script>
 const $=id=>document.getElementById(id);
-let activeId=null,timer=null,statusTimer=null,cursor=0,historyFilter='';
+let activeId=null,statusTimer=null,cursor=0,historyFilter='',streamSocket=null,streamReconnectTimer=null;
 
 function setTheme(next){
   const theme=next==='light'?'light':'dark';
@@ -262,6 +265,95 @@ function currentWorkspace(){
   return $('workspace-list').value || '';
 }
 
+function terminalPath(id){
+  return encodeURIComponent(id);
+}
+
+function workspacePath(id){
+  return encodeURIComponent(id);
+}
+
+function clearStream(){
+  if(streamReconnectTimer){
+    clearTimeout(streamReconnectTimer);
+    streamReconnectTimer=null;
+  }
+  if(streamSocket){
+    const socket=streamSocket;
+    streamSocket=null;
+    socket.__terminalId=null;
+    socket.__shouldReconnect=false;
+    try{socket.close()}catch(e){}
+  }
+}
+
+function appendEvent(type, text, timestamp){
+  const div=document.createElement('div');
+  div.className='entry '+type;
+  const txt=esc(text);
+  const ts=(timestamp||new Date().toISOString()).slice(11,19);
+  div.innerHTML='<span class="ts">'+ts+'</span><span class="tag '+(type=='input'?'in':'out')+'">'+(type=='input'?'IN':'OUT')+'</span><span class="txt '+(type=='input'?'in':'out')+'">'+txt+'</span>';
+  $('history').appendChild(div);
+}
+
+function appendStreamOutput(text, timestamp){
+  appendEvent('output', text, timestamp);
+  applyHistoryFilter();
+  $('history').scrollTop=$('history').scrollHeight;
+}
+
+function connectStream(){
+  clearStream();
+  if(!activeId) return;
+  const proto=location.protocol==='https:'?'wss:':'ws:';
+  const url=`${proto}//${location.host}/ws/${terminalPath(activeId)}?since=${cursor}`;
+  const socket=new WebSocket(url);
+  socket.__terminalId=activeId;
+  socket.__shouldReconnect=true;
+  streamSocket=socket;
+  socket.onmessage=function(ev){
+    let msg;
+    try{
+      msg=JSON.parse(ev.data);
+    }catch(e){
+      return;
+    }
+    if(msg.type==='output'){
+      appendStreamOutput(msg.text||'', msg.timestamp);
+      if(typeof msg.cursor==='number') cursor=msg.cursor;
+      return;
+    }
+    if(msg.type==='history'){
+      const events=msg.events||[];
+      for(const e of events){
+        appendEvent(e.type, e.text, e.timestamp);
+      }
+      applyHistoryFilter();
+      if(typeof msg.cursor==='number') cursor=msg.cursor;
+      $('history').scrollTop=$('history').scrollHeight;
+      return;
+    }
+    if(msg.type==='status'){
+      if(msg.status){
+        $('info-id').textContent=msg.status.id||'-';
+        $('info-pid').textContent=msg.status.pid||'-';
+        $('info-alive').textContent=msg.status.alive?'yes':'no';
+        $('info-cwd').textContent=msg.status.cwd||'-';
+        $('cmd-input').disabled=!msg.status.alive;
+        $('delete-terminal').disabled=!msg.status.alive;
+        if(!msg.status.alive) socket.__shouldReconnect=false;
+      }
+    }
+  };
+  socket.onclose=function(){
+    if(socket.__shouldReconnect && activeId===socket.__terminalId){
+      streamSocket=null;
+      streamReconnectTimer=setTimeout(()=>{if(activeId===socket.__terminalId) connectStream()},1000);
+    }
+  };
+  socket.onerror=function(){};
+}
+
 function applyHistoryFilter(){
   const entries=$('history').querySelectorAll('.entry');
   let visible=0;
@@ -277,15 +369,14 @@ async function refreshList(){
   const r=await fetch('/api/terminals'),data=await r.json();
   $('db-info').textContent=data.length?data.length+' terminal(s)':'';
   if(!data.length){$('terminal-list').innerHTML='<div style="color:#484f58;padding:12px;font-size:12px">No terminals</div>';return}
-  $('terminal-list').innerHTML=data.map(t=>`<div class="term-item${t.id===activeId?' active':''}" data-id="${t.id}" data-alive="${t.alive}">
-    <span class="status-dot ${t.alive?'on':'off'}"></span>${t.id}
+  $('terminal-list').innerHTML=data.map(t=>`<div class="term-item${t.id===activeId?' active':''}" data-id="${esc(t.id)}" data-alive="${t.alive}">
+    <span class="status-dot ${t.alive?'on':'off'}"></span>${esc(t.id)}
   </div>`).join('');
   $('terminal-list').querySelectorAll('.term-item').forEach(e=>e.onclick=()=>select(e.dataset.id));
 }
 
 async function select(id){
   activeId=id; cursor=0; historyFilter='';
-  if(timer)clearInterval(timer);
   if(statusTimer)clearInterval(statusTimer);
   setDisplay('empty', 'none');
   $('history').innerHTML='';
@@ -297,6 +388,7 @@ async function select(id){
   setText('search-results-count', '');
   setDisplay('input-bar', 'block');
   $('cmd-input').focus();
+  clearStream();
   refreshList();
   await loadStatus();
   await loadProfile();
@@ -304,13 +396,13 @@ async function select(id){
   await loadCheckpoints();
   await loadWorkspaces();
   await loadHistory();
-  timer=setInterval(loadHistory,800);
+  connectStream();
   statusTimer=setInterval(loadStatus,3000);
 }
 async function loadStatus(){
   if(!activeId)return;
   try{
-    const r=await fetch('/api/status/'+activeId),d=await r.json();
+    const r=await fetch('/api/status/'+terminalPath(activeId)),d=await r.json();
     $('info-id').textContent=d.id||'-';
     $('info-pid').textContent=d.pid||'-';
     $('info-alive').textContent=d.alive?'yes':'no';
@@ -337,7 +429,7 @@ async function loadProfile(){
     return;
   }
   try{
-    const d=await fetchJson('/api/profile/'+activeId);
+    const d=await fetchJson('/api/profile/'+terminalPath(activeId));
     $('profile-view').textContent=JSON.stringify(d,null,2);
     $('profile-startup').value=(d.startup_commands||[]).join('\\n');
   }catch(e){
@@ -363,7 +455,7 @@ async function loadWorkspaceStatus(){
     return;
   }
   try{
-    const d=await fetchJson('/api/workspaces/'+encodeURIComponent(id));
+    const d=await fetchJson('/api/workspaces/'+workspacePath(id));
     $('workspace-view').textContent=JSON.stringify(d,null,2);
     $('workspace-env-json').value=JSON.stringify(d.env||{},null,2);
     $('workspace-startup').value=(d.startup_commands||[]).join('\\n');
@@ -376,7 +468,7 @@ async function loadAlerts(){
     const terminal_id=currentTerminal();
     const qs=terminal_id?`?terminal_id=${encodeURIComponent(terminal_id)}`:'';
     const items=await fetchJson('/api/alerts'+qs);
-    $('alert-list').innerHTML=items.length?items.map(a=>`<div class="list-item" data-id="${a.id}"><span>${esc(a.scope)} ${esc(a.pattern)}${a.terminal_id?` @ ${esc(a.terminal_id)}`:''}</span><button type="button" data-remove="${a.id}">Remove</button></div>`).join(''):'<div class="muted">No alerts</div>';
+    $('alert-list').innerHTML=items.length?items.map(a=>`<div class="list-item" data-id="${esc(a.id)}"><span>${esc(a.scope)} ${esc(a.pattern)}${a.terminal_id?` @ ${esc(a.terminal_id)}`:''}</span><button type="button" data-remove="${esc(a.id)}">Remove</button></div>`).join(''):'<div class="muted">No alerts</div>';
     $('alert-list').querySelectorAll('button[data-remove]').forEach(btn=>btn.onclick=()=>removeAlert(btn.dataset.remove));
   }catch(e){
     $('alert-list').innerHTML=`<div class="muted">${esc(e.message||'alerts unavailable')}</div>`;
@@ -387,7 +479,7 @@ async function loadCheckpoints(){
     const terminal_id=currentTerminal();
     const qs=terminal_id?`?terminal_id=${encodeURIComponent(terminal_id)}`:'';
     const items=await fetchJson('/api/checkpoints'+qs);
-    $('checkpoint-list').innerHTML=items.length?items.map(c=>`<div class="list-item" data-id="${c.id}"><span>${esc(c.label)}${c.note?` — ${esc(c.note)}`:''}</span><button type="button" data-remove="${c.id}">Remove</button></div>`).join(''):'<div class="muted">No checkpoints</div>';
+    $('checkpoint-list').innerHTML=items.length?items.map(c=>`<div class="list-item" data-id="${esc(c.id)}"><span>${esc(c.label)}${c.note?` — ${esc(c.note)}`:''}</span><button type="button" data-remove="${esc(c.id)}">Remove</button></div>`).join(''):'<div class="muted">No checkpoints</div>';
     $('checkpoint-list').querySelectorAll('button[data-remove]').forEach(btn=>btn.onclick=()=>removeCheckpoint(btn.dataset.remove));
   }catch(e){
     $('checkpoint-list').innerHTML=`<div class="muted">${esc(e.message||'checkpoints unavailable')}</div>`;
@@ -396,7 +488,7 @@ async function loadCheckpoints(){
 async function exportSnapshot(){
   if(!activeId) return alert('Select a terminal first');
   try{
-    const d=await fetchJson('/api/export/'+encodeURIComponent(activeId));
+    const d=await fetchJson('/api/export/'+terminalPath(activeId));
     $('snapshot-json').value=JSON.stringify(d,null,2);
     $('snapshot-status').textContent=`Exported ${activeId}`;
   }catch(e){
@@ -438,7 +530,7 @@ async function configureWorkspace(){
     const rawEnv=$('workspace-env-json').value.trim();
     if(rawEnv) set_env=JSON.parse(rawEnv);
     const startup_commands=$('workspace-startup').value.split('\\n').map(s=>s.trim()).filter(Boolean);
-    await fetchJson('/api/workspaces/'+encodeURIComponent(workspace_id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({set_env,startup_commands,apply_to_members:true})});
+    await fetchJson('/api/workspaces/'+workspacePath(workspace_id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({set_env,startup_commands,apply_to_members:true})});
     await loadWorkspaceStatus();
     await loadProfile();
   }catch(e){
@@ -449,7 +541,7 @@ async function addTerminalToWorkspace(){
   const workspace_id=currentWorkspace();
   if(!workspace_id||!activeId) return;
   try{
-    await fetchJson('/api/workspaces/'+encodeURIComponent(workspace_id)+'/members',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({terminal_id:activeId})});
+    await fetchJson('/api/workspaces/'+workspacePath(workspace_id)+'/members',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({terminal_id:activeId})});
     await loadWorkspaceStatus();
   }catch(e){
     alert(e.message||'add member failed');
@@ -459,7 +551,7 @@ async function removeTerminalFromWorkspace(){
   const workspace_id=currentWorkspace();
   if(!workspace_id||!activeId) return;
   try{
-    await fetchJson('/api/workspaces/'+encodeURIComponent(workspace_id)+'/members/'+encodeURIComponent(activeId),{method:'DELETE'});
+    await fetchJson('/api/workspaces/'+workspacePath(workspace_id)+'/members/'+terminalPath(activeId),{method:'DELETE'});
     await loadWorkspaceStatus();
   }catch(e){
     alert(e.message||'remove member failed');
@@ -469,7 +561,7 @@ async function applyWorkspace(){
   const workspace_id=currentWorkspace();
   if(!workspace_id) return;
   try{
-    await fetchJson('/api/workspaces/'+encodeURIComponent(workspace_id)+'/apply',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({terminal_id:activeId||null})});
+    await fetchJson('/api/workspaces/'+workspacePath(workspace_id)+'/apply',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({terminal_id:activeId||null})});
     await loadWorkspaceStatus();
     await loadProfile();
   }catch(e){
@@ -481,7 +573,7 @@ async function saveProfileEnv(set){
   const key=$('profile-key').value.trim();
   const value=$('profile-value').value;
   try{
-    await fetchJson('/api/profile/'+encodeURIComponent(activeId),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(set?{set_env:{[key]:value}}:{unset_env:[key]})});
+    await fetchJson('/api/profile/'+terminalPath(activeId),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(set?{set_env:{[key]:value}}:{unset_env:[key]})});
     await loadProfile();
   }catch(e){
     alert(e.message||'profile update failed');
@@ -492,7 +584,7 @@ async function saveStartup(){
   const startup_commands=$('profile-startup').value.split('\\n').map(s=>s.trim()).filter(Boolean);
   const run_startup_commands=$('profile-run-startup').checked;
   try{
-    await fetchJson('/api/profile/'+encodeURIComponent(activeId),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({startup_commands,run_startup_commands})});
+    await fetchJson('/api/profile/'+terminalPath(activeId),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({startup_commands,run_startup_commands})});
     await loadProfile();
     await loadHistory();
   }catch(e){
@@ -542,13 +634,9 @@ async function removeCheckpoint(id){
 async function loadHistory(){
   if(!activeId)return;
   try{
-    const r=await fetch('/api/history/'+activeId+'?since='+cursor),d=await r.json();
+    const r=await fetch('/api/history/'+terminalPath(activeId)+'?since='+cursor),d=await r.json();
     for(const e of d.events){
-      const div=document.createElement('div');
-      div.className='entry '+e.type;
-      const txt=esc(e.text);
-      div.innerHTML='<span class="ts">'+e.timestamp.slice(11,19)+'</span><span class="tag '+(e.type=='input'?'in':'out')+'">'+(e.type=='input'?'IN':'OUT')+'</span><span class="txt '+(e.type=='input'?'in':'out')+'">'+txt+'</span>';
-      $('history').appendChild(div);
+      appendEvent(e.type, e.text, e.timestamp);
     }
     applyHistoryFilter();
     if(d.events.length){cursor=d.cursor;$('history').scrollTop=$('history').scrollHeight}
@@ -573,12 +661,12 @@ async function deleteSession(){
   if(!activeId)return;
   if(!confirm('Delete terminal '+activeId+'?'))return;
   try{
-    const r=await fetch('/api/kill/'+activeId,{method:'POST'});
+    const r=await fetch('/api/kill/'+terminalPath(activeId),{method:'POST'});
     const d=await r.json();
     if(!r.ok)throw new Error(d.error||'delete failed');
     activeId=null; cursor=0;
-    if(timer)clearInterval(timer);
     if(statusTimer)clearInterval(statusTimer);
+    clearStream();
     $('history').innerHTML='';
     setDisplay('empty', 'flex');
     setDisplay('input-bar', 'none');
@@ -605,7 +693,7 @@ async function sendCmd(){
   if(!text||!activeId)return;
   inp.value='';
   try{
-    await fetch('/api/send/'+activeId,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text+'\\n'})});
+    await fetch('/api/send/'+terminalPath(activeId),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text+'\\n'})});
   }catch(e){}
 }
 async function searchOutput(){
@@ -617,7 +705,7 @@ async function searchOutput(){
     return;
   }
   try{
-    const r=await fetch('/api/search/'+activeId+'?query='+encodeURIComponent(query));
+    const r=await fetch('/api/search/'+terminalPath(activeId)+'?query='+encodeURIComponent(query));
     const d=await r.json();
     if(!r.ok)throw new Error(d.error||'search failed');
     const matches=d.matches||[];
@@ -628,7 +716,7 @@ async function searchOutput(){
     alert(e.message||'search failed');
   }
 }
-function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
 $('history-search').oninput=function(e){historyFilter=e.target.value.trim().toLowerCase();applyHistoryFilter()};
 $('history-clear').onclick=function(){historyFilter='';$('history-search').value='';applyHistoryFilter();$('cmd-input').focus()};
 $('output-search-btn').onclick=searchOutput;
@@ -641,7 +729,7 @@ $('cmd-input').onkeydown=function(e){if(e.key==='Enter'){e.preventDefault();send
 $('workspace-refresh-btn').onclick=loadWorkspaces;
 $('workspace-list').onchange=loadWorkspaceStatus;
 $('workspace-create-btn').onclick=createWorkspace;
-$('workspace-apply-btn').onclick=applyWorkspace;
+$('workspace-apply-btn').onclick=configureWorkspace;
 $('workspace-add-member-btn').onclick=addTerminalToWorkspace;
 $('workspace-remove-member-btn').onclick=removeTerminalFromWorkspace;
 $('profile-set-btn').onclick=function(){saveProfileEnv(true)};
@@ -902,6 +990,60 @@ def create_app(manager):
         except RuntimeError as e:
             return JSONResponse({"error": str(e)}, status_code=400)
 
+    async def ws_terminal(websocket: WebSocket):
+        terminal_id = websocket.path_params["terminal_id"]
+        since = int(websocket.query_params.get("since", 0))
+        await websocket.accept()
+        try:
+            try:
+                session = manager.get(terminal_id)
+            except KeyError:
+                history = manager.get_history(terminal_id, since)
+                await websocket.send_json({"type": "history", **history})
+                await websocket.send_json({"type": "status", "status": manager.status(terminal_id)})
+                await websocket.close()
+                return
+
+            queue: asyncio.Queue[dict] = asyncio.Queue()
+
+            def listener(text: str) -> None:
+                queue.put_nowait(
+                    {
+                        "type": "output",
+                        "text": text,
+                        "cursor": session.cursor,
+                        "timestamp": session.updated_at.isoformat(),
+                    }
+                )
+
+            session.add_output_listener(listener)
+            try:
+                try:
+                    history = manager.get_history(terminal_id, since)
+                except KeyError:
+                    history = {"events": [], "cursor": since}
+                await websocket.send_json({"type": "history", **history})
+                await websocket.send_json({"type": "status", "status": manager.status(terminal_id)})
+                while True:
+                    try:
+                        event = await asyncio.wait_for(queue.get(), timeout=1.0)
+                    except asyncio.TimeoutError:
+                        if not session.alive:
+                            await websocket.send_json({"type": "status", "status": manager.status(terminal_id)})
+                            break
+                        continue
+                    await websocket.send_json(event)
+                await websocket.close()
+            finally:
+                session.remove_output_listener(listener)
+        except WebSocketDisconnect:
+            return
+        except KeyError:
+            await websocket.close(code=4404)
+        except Exception as e:
+            log(f"websocket error for '{terminal_id}': {e}", "WEB")
+            await websocket.close(code=1011)
+
     return Starlette(routes=[
         Route("/", index),
         Route("/api/terminals", api_terminals),
@@ -930,4 +1072,5 @@ def create_app(manager):
         Route("/api/export/{terminal_id}", api_export),
         Route("/api/import", api_import, methods=["POST"]),
         Route("/api/send/{terminal_id}", api_send, methods=["POST"]),
+        WebSocketRoute("/ws/{terminal_id}", ws_terminal),
     ])
