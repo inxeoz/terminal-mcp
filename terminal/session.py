@@ -19,6 +19,7 @@ class TerminalSession:
     alive: bool = True
     reader_task: asyncio.Task | None = None
     on_output: Callable[[str], None] | None = None
+    on_error: Callable[[str], None] | None = None
 
     def append_output(self, text: str) -> None:
         if not text:

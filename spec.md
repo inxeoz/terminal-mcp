@@ -24,13 +24,15 @@ AI Agent (OpenCode, MCP Inspector, etc.)
 │ i4z-terminal-mcp                    │
 │                                     │
 │  ┌─ MCP Server ───────────────────┐ │
-│  │  10 tools exposed to AI        │ │
+│  │  34 tools exposed to AI        │ │
 │  │  stdio transport               │ │
 │  └────────────────────────────────┘ │
 │                                     │
 │  ┌─ SessionManager ───────────────┐ │
 │  │  TerminalSession registry      │ │
 │  │  HistoryStore adapter          │ │
+│  │  Profiles + alerts + health    │ │
+│  │  Checkpoints + exports         │ │
 │  │  Output buffer (cursor model)  │ │
 │  └────────────────────────────────┘ │
 │                                     │
@@ -43,7 +45,7 @@ AI Agent (OpenCode, MCP Inspector, etc.)
 │                                     │
 │  ┌─ Web Server (starlette) ───────┐ │
 │  │  :9020 (or random free port)   │ │
-│  │  6 REST endpoints              │ │
+│  │  26 REST endpoints             │ │
 │  │  xterm.js UI                   │ │
 │  └────────────────────────────────┘ │
 └─────────────────────────────────────┘
@@ -58,9 +60,9 @@ i4z-terminal-mcp/
 ├── terminal/
 │   ├── __init__.py
 │   ├── server.py       # MCP server entry point, CLI main()
-│   ├── tools.py        # 10 MCP tool definitions (JSON Schema)
-│   ├── manager.py      # SessionManager: lifecycle, delegation
-│   ├── history.py      # HistoryStore: SQLite events/history/search
+│   ├── tools.py        # MCP tool definitions (JSON Schema)
+│   ├── manager.py      # SessionManager: lifecycle, profiles, alerts, exports
+│   ├── history.py      # HistoryStore: SQLite events/history/profiles/alerts/bookmarks/health
 │   ├── session.py      # TerminalSession: PTY shell, output buffer, cursor
 │   ├── reader.py       # Background asyncio reader loop (50ms poll)
 │   ├── signals.py      # SIGINT/SIGTERM/SIGKILL dispatch
@@ -75,7 +77,7 @@ i4z-terminal-mcp/
 
 ---
 
-## MCP Tools (10)
+## MCP Tools (34)
 
 ### `create_terminal`
 Spawn a persistent PTY-backed `/bin/bash` session.
@@ -98,6 +100,33 @@ Get runtime metadata for a terminal.
 | `terminal_id` | string | yes | Terminal ID |
 
 Returns: `{"id": "...", "alive": true, "pid": 12345, "cwd": "/project", "created_at": "...", "last_activity": "..."}`
+
+### `terminal_profile`
+Get stored env vars and startup commands for a terminal.
+
+### `configure_terminal`
+Update env vars, startup commands, or both for a live terminal.
+
+### `create_workspace`
+Create a workspace profile.
+
+### `list_workspaces`
+List workspace profiles.
+
+### `workspace_status`
+Get a workspace profile and its members.
+
+### `configure_workspace`
+Update a workspace profile and optionally apply it to live members.
+
+### `add_terminal_to_workspace`
+Add a terminal to a workspace and apply the workspace profile.
+
+### `remove_terminal_from_workspace`
+Remove a terminal from a workspace.
+
+### `apply_workspace`
+Apply a workspace profile to its member terminals or one terminal.
 
 ### `send_input`
 Write text/commands to the PTY stdin. Include `\n` to execute.
@@ -154,6 +183,36 @@ Search the raw PTY output buffer for a query (case-insensitive).
 
 Returns: `{"matches": ["line containing query", ...]}`
 
+### `add_output_alert`
+Register a global or session-scoped output alert pattern.
+
+### `list_output_alerts`
+List registered output alert patterns.
+
+### `remove_output_alert`
+Remove a stored alert pattern.
+
+### `list_alert_events`
+List alert matches that have fired.
+
+### `health_report`
+Get a health summary for sessions, alerts, and persistence.
+
+### `add_checkpoint`
+Mark a named checkpoint at a cursor position.
+
+### `list_checkpoints`
+List checkpoints for one terminal or all terminals.
+
+### `remove_checkpoint`
+Remove a checkpoint.
+
+### `export_session`
+Export a session bundle for snapshot or handoff.
+
+### `import_session`
+Restore a session bundle into a live terminal.
+
 ### `web_url`
 Return the web UI URL for the current server instance.
 No parameters.
@@ -166,15 +225,34 @@ Returns: `{"url": "http://127.0.0.1:9020"}`
 
 The embedded Starlette server serves a single-page app at the port configured via `I4Z_TERMINAL_WEB_PORT` (default: random free port).
 
-### REST Endpoints (6)
+### REST Endpoints (26)
 
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/` | xterm.js + history HTML UI |
 | `GET` | `/api/terminals` | JSON list of all terminals |
 | `GET` | `/api/status/{id}` | JSON: PID, alive, CWD, timestamps |
+| `GET` | `/api/profile/{id}` | Session env vars and startup commands |
+| `POST` | `/api/profile/{id}` | Update session env vars and startup commands |
 | `GET` | `/api/output/{id}?since=N` | Raw PTY output (cursor-based, for xterm.js) |
 | `GET` | `/api/history/{id}?since=N` | Clean ANSI-stripped input/output events from SQLite |
+| `GET` | `/api/health` | Health summary for sessions, alerts, and persistence |
+| `GET` | `/api/workspaces` | JSON list of workspace profiles |
+| `POST` | `/api/workspaces` | Create a workspace profile |
+| `GET` | `/api/workspaces/{workspace_id}` | Workspace profile and members |
+| `POST` | `/api/workspaces/{workspace_id}` | Update a workspace profile |
+| `POST` | `/api/workspaces/{workspace_id}/members` | Add a terminal to a workspace |
+| `DELETE` | `/api/workspaces/{workspace_id}/members/{terminal_id}` | Remove a terminal from a workspace |
+| `POST` | `/api/workspaces/{workspace_id}/apply` | Apply a workspace profile |
+| `GET` | `/api/alerts` | List output alerts |
+| `POST` | `/api/alerts` | Create an output alert |
+| `DELETE` | `/api/alerts/{alert_id}` | Remove an output alert |
+| `GET` | `/api/alert-events` | List alert matches |
+| `GET` | `/api/checkpoints` | List checkpoints |
+| `POST` | `/api/checkpoints` | Create a checkpoint |
+| `DELETE` | `/api/checkpoints/{checkpoint_id}` | Remove a checkpoint |
+| `GET` | `/api/export/{terminal_id}` | Export a session bundle |
+| `POST` | `/api/import` | Import a session bundle |
 | `POST` | `/api/send/{id}` | `{"text": "command\n"}` — execute in terminal |
 
 ### Frontend Layout
@@ -197,6 +275,7 @@ The embedded Starlette server serves a single-page app at the port configured vi
 
 - **xterm.js** (v5 via CDN importmap): renders raw PTY output with full ANSI support. Polls `GET /api/output/{id}` every 150ms. Keystrokes captured via `term.onData()` and sent to `POST /api/send/{id}`.
 - **History panel**: clean input/output log from SQLite (ANSI-stripped). Polls `GET /api/history/{id}` every 1s.
+- **Management panels**: session profile, workspace, alert, checkpoint, and snapshot panels control the new features directly from the browser UI.
 - **Draggable grip**: resize terminal vs history panel vertically.
 - **Sidebar**: terminal list with green/red status dots, auto-refreshes every 2s.
 

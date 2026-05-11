@@ -95,6 +95,24 @@ body{background:var(--bg);color:var(--fg);font-family:monospace;display:flex;hei
 #input-bar input{width:100%;background:var(--input);border:1px solid var(--border);color:var(--fg);font-family:monospace;font-size:13px;padding:8px 12px;border-radius:4px;outline:none}
 #input-bar input:focus{border-color:var(--accent)}
 #db-info{font-size:11px;color:var(--muted-2);padding:4px 12px;border-top:1px solid var(--border)}
+#health{padding:8px 16px;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted);background:var(--panel)}
+#feature-panels{border-bottom:1px solid var(--border);background:var(--bg);flex-shrink:0}
+#feature-panels>summary{cursor:pointer;padding:8px 12px;color:var(--accent);font-size:12px}
+#feature-panels .panel-grid{padding:0 12px 8px;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:8px;max-height:260px;overflow:auto}
+.card{border:1px solid var(--border);border-radius:6px;background:var(--panel);padding:8px;display:flex;flex-direction:column;gap:6px}
+.card h3{font-size:12px;color:var(--accent)}
+.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.card input,.card textarea,.card select{background:var(--input);border:1px solid var(--border);color:var(--fg);font-family:monospace;font-size:11px;padding:6px 8px;border-radius:4px;outline:none}
+.card input:focus,.card textarea:focus,.card select:focus{border-color:var(--accent)}
+.card textarea{min-height:52px;resize:vertical}
+.card button{background:var(--button);border:1px solid var(--border);color:var(--fg);font-family:monospace;font-size:11px;padding:6px 8px;border-radius:4px;cursor:pointer}
+.card button:hover{background:var(--button-hover)}
+.card button:disabled{opacity:.5;cursor:not-allowed}
+.card pre{white-space:pre-wrap;word-break:break-word;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:6px;font-size:11px;max-height:120px;overflow:auto}
+.list{display:flex;flex-direction:column;gap:4px;max-height:120px;overflow:auto}
+.list-item{display:flex;justify-content:space-between;gap:6px;align-items:center;border:1px solid var(--border);border-radius:4px;padding:4px 6px;font-size:11px}
+.list-item button{padding:3px 6px;font-size:10px}
+.muted{color:var(--muted-2);font-size:11px}
 </style>
 </head>
 <body>
@@ -118,6 +136,74 @@ body{background:var(--bg);color:var(--fg);font-family:monospace;display:flex;hei
     <button id="theme-toggle" type="button">Theme: dark</button>
   </div>
 </div>
+<div id="health">Health: loading...</div>
+<details id="feature-panels">
+  <summary>Management panels</summary>
+  <div class="panel-grid">
+  <div class="card">
+    <h3>Session profile</h3>
+    <div class="row">
+      <input id="profile-key" placeholder="ENV_KEY" style="flex:1;min-width:100px">
+      <input id="profile-value" placeholder="value" style="flex:1;min-width:100px">
+      <button id="profile-set-btn" type="button">Set env</button>
+      <button id="profile-unset-btn" type="button">Unset env</button>
+    </div>
+    <textarea id="profile-startup" placeholder="startup commands, one per line"></textarea>
+    <div class="row">
+      <label style="font-size:11px;color:var(--muted)"><input id="profile-run-startup" type="checkbox"> run now</label>
+      <button id="profile-save-btn" type="button">Save startup</button>
+    </div>
+    <pre id="profile-view">Select a terminal</pre>
+  </div>
+  <div class="card">
+    <h3>Workspace profiles</h3>
+    <div class="row">
+      <input id="workspace-id" placeholder="workspace id" style="flex:1;min-width:110px">
+      <button id="workspace-create-btn" type="button">Create</button>
+      <button id="workspace-refresh-btn" type="button">Refresh</button>
+    </div>
+    <textarea id="workspace-env-json" placeholder='env JSON, e.g. {"NODE_ENV":"dev"}'></textarea>
+    <textarea id="workspace-startup" placeholder="workspace startup commands, one per line"></textarea>
+    <div class="row">
+      <select id="workspace-list" style="flex:1;min-width:130px"></select>
+      <button id="workspace-apply-btn" type="button">Apply</button>
+      <button id="workspace-add-member-btn" type="button">Add member</button>
+      <button id="workspace-remove-member-btn" type="button">Remove member</button>
+    </div>
+    <pre id="workspace-view">No workspace selected</pre>
+  </div>
+  <div class="card">
+    <h3>Output alerts</h3>
+    <div class="row">
+      <select id="alert-scope"><option value="session">session</option><option value="global">global</option></select>
+      <input id="alert-pattern" placeholder="pattern" style="flex:1;min-width:110px">
+      <input id="alert-label" placeholder="label" style="flex:1;min-width:90px">
+      <button id="alert-add-btn" type="button">Add</button>
+      <button id="alert-refresh-btn" type="button">Refresh</button>
+    </div>
+    <div id="alert-list" class="list"></div>
+  </div>
+  <div class="card">
+    <h3>Checkpoints</h3>
+    <div class="row">
+      <input id="checkpoint-label" placeholder="label" style="flex:1;min-width:90px">
+      <input id="checkpoint-note" placeholder="note" style="flex:1;min-width:90px">
+      <button id="checkpoint-add-btn" type="button">Add</button>
+      <button id="checkpoint-refresh-btn" type="button">Refresh</button>
+    </div>
+    <div id="checkpoint-list" class="list"></div>
+  </div>
+  <div class="card">
+    <h3>Snapshots</h3>
+    <div class="row">
+      <button id="snapshot-export-btn" type="button">Export selected</button>
+      <button id="snapshot-import-btn" type="button">Import JSON</button>
+    </div>
+    <textarea id="snapshot-json" placeholder="Exported JSON appears here or paste a snapshot to import"></textarea>
+    <pre id="snapshot-status">No snapshot loaded</pre>
+  </div>
+  </div>
+</details>
 <div id="toolbar">
   <input id="history-search" placeholder="Filter history...">
   <button id="history-clear" type="button">Clear</button>
@@ -161,6 +247,21 @@ function setText(id, value){
   if(el) el.textContent=value;
 }
 
+async function fetchJson(url, options){
+  const r=await fetch(url, options);
+  const data=await r.json();
+  if(!r.ok) throw new Error(data.error||'request failed');
+  return data;
+}
+
+function currentTerminal(){
+  return activeId;
+}
+
+function currentWorkspace(){
+  return $('workspace-list').value || '';
+}
+
 function applyHistoryFilter(){
   const entries=$('history').querySelectorAll('.entry');
   let visible=0;
@@ -198,6 +299,10 @@ async function select(id){
   $('cmd-input').focus();
   refreshList();
   await loadStatus();
+  await loadProfile();
+  await loadAlerts();
+  await loadCheckpoints();
+  await loadWorkspaces();
   await loadHistory();
   timer=setInterval(loadHistory,800);
   statusTimer=setInterval(loadStatus,3000);
@@ -213,6 +318,226 @@ async function loadStatus(){
     $('cmd-input').disabled=!d.alive;
     $('delete-terminal').disabled=!d.alive;
   }catch(e){}
+}
+async function loadHealth(){
+  try{
+    const d=await fetchJson('/api/health');
+    const counts=d.counts||{};
+    const sessions=d.sessions||{};
+    const errors=d.reader_errors||[];
+    $('health').textContent=`Health: db ${d.db&&d.db.ok?'ok':'bad'} | sessions ${sessions.active||0} active, ${sessions.stale?sessions.stale.length:0} stale | alerts ${counts.alerts||0}, alert hits ${counts.alert_events||0} | workspaces ${counts.workspaces||0} | reader errors ${errors.length}`;
+  }catch(e){
+    $('health').textContent='Health: unavailable';
+  }
+}
+async function loadProfile(){
+  if(!activeId){
+    $('profile-view').textContent='Select a terminal';
+    $('profile-startup').value='';
+    return;
+  }
+  try{
+    const d=await fetchJson('/api/profile/'+activeId);
+    $('profile-view').textContent=JSON.stringify(d,null,2);
+    $('profile-startup').value=(d.startup_commands||[]).join('\\n');
+  }catch(e){
+    $('profile-view').textContent=e.message||'profile unavailable';
+  }
+}
+async function loadWorkspaces(){
+  try{
+    const items=await fetchJson('/api/workspaces');
+    $('workspace-list').innerHTML=items.map(ws=>`<option value="${esc(ws.id)}">${esc(ws.id)} (${ws.member_count||0})</option>`).join('');
+    if(items.length && !$('workspace-list').value) $('workspace-list').value=items[0].id;
+    if(currentWorkspace()) await loadWorkspaceStatus();
+    else $('workspace-view').textContent='No workspace selected';
+  }catch(e){
+    $('workspace-list').innerHTML='';
+    $('workspace-view').textContent=e.message||'workspaces unavailable';
+  }
+}
+async function loadWorkspaceStatus(){
+  const id=currentWorkspace();
+  if(!id){
+    $('workspace-view').textContent='No workspace selected';
+    return;
+  }
+  try{
+    const d=await fetchJson('/api/workspaces/'+encodeURIComponent(id));
+    $('workspace-view').textContent=JSON.stringify(d,null,2);
+    $('workspace-env-json').value=JSON.stringify(d.env||{},null,2);
+    $('workspace-startup').value=(d.startup_commands||[]).join('\\n');
+  }catch(e){
+    $('workspace-view').textContent=e.message||'workspace unavailable';
+  }
+}
+async function loadAlerts(){
+  try{
+    const terminal_id=currentTerminal();
+    const qs=terminal_id?`?terminal_id=${encodeURIComponent(terminal_id)}`:'';
+    const items=await fetchJson('/api/alerts'+qs);
+    $('alert-list').innerHTML=items.length?items.map(a=>`<div class="list-item" data-id="${a.id}"><span>${esc(a.scope)} ${esc(a.pattern)}${a.terminal_id?` @ ${esc(a.terminal_id)}`:''}</span><button type="button" data-remove="${a.id}">Remove</button></div>`).join(''):'<div class="muted">No alerts</div>';
+    $('alert-list').querySelectorAll('button[data-remove]').forEach(btn=>btn.onclick=()=>removeAlert(btn.dataset.remove));
+  }catch(e){
+    $('alert-list').innerHTML=`<div class="muted">${esc(e.message||'alerts unavailable')}</div>`;
+  }
+}
+async function loadCheckpoints(){
+  try{
+    const terminal_id=currentTerminal();
+    const qs=terminal_id?`?terminal_id=${encodeURIComponent(terminal_id)}`:'';
+    const items=await fetchJson('/api/checkpoints'+qs);
+    $('checkpoint-list').innerHTML=items.length?items.map(c=>`<div class="list-item" data-id="${c.id}"><span>${esc(c.label)}${c.note?` — ${esc(c.note)}`:''}</span><button type="button" data-remove="${c.id}">Remove</button></div>`).join(''):'<div class="muted">No checkpoints</div>';
+    $('checkpoint-list').querySelectorAll('button[data-remove]').forEach(btn=>btn.onclick=()=>removeCheckpoint(btn.dataset.remove));
+  }catch(e){
+    $('checkpoint-list').innerHTML=`<div class="muted">${esc(e.message||'checkpoints unavailable')}</div>`;
+  }
+}
+async function exportSnapshot(){
+  if(!activeId) return alert('Select a terminal first');
+  try{
+    const d=await fetchJson('/api/export/'+encodeURIComponent(activeId));
+    $('snapshot-json').value=JSON.stringify(d,null,2);
+    $('snapshot-status').textContent=`Exported ${activeId}`;
+  }catch(e){
+    alert(e.message||'export failed');
+  }
+}
+async function importSnapshot(){
+  const raw=$('snapshot-json').value.trim();
+  if(!raw) return alert('Paste a snapshot JSON first');
+  try{
+    const snapshot=JSON.parse(raw);
+    const d=await fetchJson('/api/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({snapshot})});
+    $('snapshot-status').textContent=`Imported ${d.terminal_id}`;
+    await refreshList();
+  }catch(e){
+    alert(e.message||'import failed');
+  }
+}
+async function createWorkspace(){
+  const workspace_id=$('workspace-id').value.trim();
+  if(!workspace_id) return;
+  try{
+    let env={};
+    const rawEnv=$('workspace-env-json').value.trim();
+    if(rawEnv) env=JSON.parse(rawEnv);
+    const startup_commands=$('workspace-startup').value.split('\\n').map(s=>s.trim()).filter(Boolean);
+    await fetchJson('/api/workspaces',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({workspace_id,env,startup_commands})});
+    $('workspace-view').textContent='workspace created';
+    await loadWorkspaces();
+  }catch(e){
+    alert(e.message||'workspace create failed');
+  }
+}
+async function configureWorkspace(){
+  const workspace_id=currentWorkspace();
+  if(!workspace_id) return;
+  try{
+    let set_env={};
+    const rawEnv=$('workspace-env-json').value.trim();
+    if(rawEnv) set_env=JSON.parse(rawEnv);
+    const startup_commands=$('workspace-startup').value.split('\\n').map(s=>s.trim()).filter(Boolean);
+    await fetchJson('/api/workspaces/'+encodeURIComponent(workspace_id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({set_env,startup_commands,apply_to_members:true})});
+    await loadWorkspaceStatus();
+    await loadProfile();
+  }catch(e){
+    alert(e.message||'workspace update failed');
+  }
+}
+async function addTerminalToWorkspace(){
+  const workspace_id=currentWorkspace();
+  if(!workspace_id||!activeId) return;
+  try{
+    await fetchJson('/api/workspaces/'+encodeURIComponent(workspace_id)+'/members',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({terminal_id:activeId})});
+    await loadWorkspaceStatus();
+  }catch(e){
+    alert(e.message||'add member failed');
+  }
+}
+async function removeTerminalFromWorkspace(){
+  const workspace_id=currentWorkspace();
+  if(!workspace_id||!activeId) return;
+  try{
+    await fetchJson('/api/workspaces/'+encodeURIComponent(workspace_id)+'/members/'+encodeURIComponent(activeId),{method:'DELETE'});
+    await loadWorkspaceStatus();
+  }catch(e){
+    alert(e.message||'remove member failed');
+  }
+}
+async function applyWorkspace(){
+  const workspace_id=currentWorkspace();
+  if(!workspace_id) return;
+  try{
+    await fetchJson('/api/workspaces/'+encodeURIComponent(workspace_id)+'/apply',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({terminal_id:activeId||null})});
+    await loadWorkspaceStatus();
+    await loadProfile();
+  }catch(e){
+    alert(e.message||'apply workspace failed');
+  }
+}
+async function saveProfileEnv(set){
+  if(!activeId) return alert('Select a terminal first');
+  const key=$('profile-key').value.trim();
+  const value=$('profile-value').value;
+  try{
+    await fetchJson('/api/profile/'+encodeURIComponent(activeId),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(set?{set_env:{[key]:value}}:{unset_env:[key]})});
+    await loadProfile();
+  }catch(e){
+    alert(e.message||'profile update failed');
+  }
+}
+async function saveStartup(){
+  if(!activeId) return alert('Select a terminal first');
+  const startup_commands=$('profile-startup').value.split('\\n').map(s=>s.trim()).filter(Boolean);
+  const run_startup_commands=$('profile-run-startup').checked;
+  try{
+    await fetchJson('/api/profile/'+encodeURIComponent(activeId),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({startup_commands,run_startup_commands})});
+    await loadProfile();
+    await loadHistory();
+  }catch(e){
+    alert(e.message||'startup save failed');
+  }
+}
+async function addAlert(){
+  const scope=$('alert-scope').value;
+  const pattern=$('alert-pattern').value.trim();
+  const label=$('alert-label').value.trim();
+  if(!pattern) return;
+  try{
+    await fetchJson('/api/alerts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({scope,pattern,label,terminal_id:scope==='session'?activeId:null})});
+    await loadAlerts();
+  }catch(e){
+    alert(e.message||'alert create failed');
+  }
+}
+async function removeAlert(id){
+  try{
+    await fetchJson('/api/alerts/'+encodeURIComponent(id),{method:'DELETE'});
+    await loadAlerts();
+  }catch(e){
+    alert(e.message||'alert remove failed');
+  }
+}
+async function addCheckpoint(){
+  if(!activeId) return alert('Select a terminal first');
+  const label=$('checkpoint-label').value.trim();
+  const note=$('checkpoint-note').value.trim();
+  if(!label) return;
+  try{
+    await fetchJson('/api/checkpoints',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({terminal_id:activeId,label,note})});
+    await loadCheckpoints();
+  }catch(e){
+    alert(e.message||'checkpoint add failed');
+  }
+}
+async function removeCheckpoint(id){
+  try{
+    await fetchJson('/api/checkpoints/'+encodeURIComponent(id),{method:'DELETE'});
+    await loadCheckpoints();
+  }catch(e){
+    alert(e.message||'checkpoint remove failed');
+  }
 }
 async function loadHistory(){
   if(!activeId)return;
@@ -263,7 +588,13 @@ async function deleteSession(){
     $('info-pid').textContent='-';
     $('info-alive').textContent='-';
     $('info-cwd').textContent='-';
+    $('profile-view').textContent='Select a terminal';
+    $('profile-startup').value='';
+    $('workspace-view').textContent='No workspace selected';
+    $('alert-list').innerHTML='';
+    $('checkpoint-list').innerHTML='';
     await refreshList();
+    await loadHealth();
   }catch(e){
     alert(e.message||'delete failed');
   }
@@ -307,9 +638,27 @@ $('create-name').onkeydown=function(e){if(e.key==='Enter'){e.preventDefault();cr
 $('delete-terminal').onclick=deleteSession;
 $('theme-toggle').onclick=function(){setTheme(document.body.dataset.theme==='dark'?'light':'dark')};
 $('cmd-input').onkeydown=function(e){if(e.key==='Enter'){e.preventDefault();sendCmd()}};
+$('workspace-refresh-btn').onclick=loadWorkspaces;
+$('workspace-list').onchange=loadWorkspaceStatus;
+$('workspace-create-btn').onclick=createWorkspace;
+$('workspace-apply-btn').onclick=applyWorkspace;
+$('workspace-add-member-btn').onclick=addTerminalToWorkspace;
+$('workspace-remove-member-btn').onclick=removeTerminalFromWorkspace;
+$('profile-set-btn').onclick=function(){saveProfileEnv(true)};
+$('profile-unset-btn').onclick=function(){saveProfileEnv(false)};
+$('profile-save-btn').onclick=saveStartup;
+$('alert-add-btn').onclick=addAlert;
+$('alert-refresh-btn').onclick=loadAlerts;
+$('checkpoint-add-btn').onclick=addCheckpoint;
+$('checkpoint-refresh-btn').onclick=loadCheckpoints;
+$('snapshot-export-btn').onclick=exportSnapshot;
+$('snapshot-import-btn').onclick=importSnapshot;
 setInterval(refreshList,2000);
+setInterval(loadHealth,4000);
 setTheme(localStorage.getItem('i4z-terminal-theme')||((window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches)?'light':'dark'));
 refreshList();
+loadHealth();
+loadWorkspaces();
 </script>
 </body>
 </html>"""
@@ -354,6 +703,100 @@ def create_app(manager):
         except KeyError:
             return JSONResponse({"error": "not found"}, status_code=404)
 
+    async def api_profile(request):
+        terminal_id = request.path_params["terminal_id"]
+        try:
+            return JSONResponse(manager.get_profile(terminal_id))
+        except KeyError:
+            return JSONResponse({"error": "terminal not found"}, status_code=404)
+
+    async def api_profile_update(request: Request):
+        terminal_id = request.path_params["terminal_id"]
+        body = await request.json()
+        try:
+            result = manager.get_profile(terminal_id)
+            for key, value in (body.get("set_env") or {}).items():
+                result = manager.set_env(terminal_id, key, str(value))
+            for key in body.get("unset_env") or []:
+                result = manager.unset_env(terminal_id, key)
+            if "startup_commands" in body:
+                result = manager.set_startup_commands(terminal_id, [str(cmd) for cmd in body.get("startup_commands") or []])
+            if body.get("run_startup_commands"):
+                manager.run_startup_commands(terminal_id, [str(cmd) for cmd in body.get("startup_commands") or []] if "startup_commands" in body else None)
+                result = manager.get_profile(terminal_id)
+            return JSONResponse(result)
+        except KeyError:
+            return JSONResponse({"error": "terminal not found"}, status_code=404)
+        except ValueError as e:
+            return JSONResponse({"error": str(e)}, status_code=400)
+
+    async def api_workspaces(request):
+        log("GET /api/workspaces", "WEB")
+        return JSONResponse(manager.list_workspaces())
+
+    async def api_workspace_create(request: Request):
+        body = await request.json()
+        workspace_id = str(body.get("workspace_id", "")).strip()
+        if not workspace_id:
+            return JSONResponse({"error": "workspace_id cannot be empty"}, status_code=400)
+        try:
+            ws = manager.create_workspace(workspace_id, body.get("env"), body.get("startup_commands"))
+            log(f"POST /api/workspaces '{workspace_id}'", "WEB")
+            return JSONResponse(ws)
+        except ValueError as e:
+            return JSONResponse({"error": str(e)}, status_code=400)
+
+    async def api_workspace_item(request):
+        workspace_id = request.path_params["workspace_id"]
+        try:
+            return JSONResponse(manager.workspace_status(workspace_id))
+        except KeyError:
+            return JSONResponse({"error": "workspace not found"}, status_code=404)
+
+    async def api_workspace_update(request: Request):
+        workspace_id = request.path_params["workspace_id"]
+        body = await request.json()
+        try:
+            ws = manager.configure_workspace(
+                workspace_id,
+                body.get("set_env"),
+                body.get("unset_env"),
+                body.get("startup_commands"),
+                bool(body.get("apply_to_members", True)),
+            )
+            return JSONResponse(ws)
+        except KeyError:
+            return JSONResponse({"error": "workspace not found"}, status_code=404)
+
+    async def api_workspace_add_member(request: Request):
+        workspace_id = request.path_params["workspace_id"]
+        body = await request.json()
+        terminal_id = str(body.get("terminal_id", "")).strip()
+        if not terminal_id:
+            return JSONResponse({"error": "terminal_id cannot be empty"}, status_code=400)
+        try:
+            ws = manager.add_terminal_to_workspace(workspace_id, terminal_id)
+            return JSONResponse(ws)
+        except KeyError as e:
+            return JSONResponse({"error": str(e)}, status_code=404)
+
+    async def api_workspace_remove_member(request: Request):
+        workspace_id = request.path_params["workspace_id"]
+        terminal_id = request.path_params["terminal_id"]
+        try:
+            ws = manager.remove_terminal_from_workspace(workspace_id, terminal_id)
+            return JSONResponse(ws)
+        except KeyError as e:
+            return JSONResponse({"error": str(e)}, status_code=404)
+
+    async def api_workspace_apply(request: Request):
+        workspace_id = request.path_params["workspace_id"]
+        body = await request.json()
+        try:
+            return JSONResponse(manager.apply_workspace(workspace_id, body.get("terminal_id")))
+        except KeyError as e:
+            return JSONResponse({"error": str(e)}, status_code=404)
+
     async def api_history(request):
         terminal_id = request.path_params["terminal_id"]
         since = int(request.query_params.get("since", 0))
@@ -377,6 +820,73 @@ def create_app(manager):
         except KeyError:
             return JSONResponse({"error": "terminal not found"}, status_code=404)
 
+    async def api_health(request):
+        log("GET /api/health", "WEB")
+        return JSONResponse(manager.health())
+
+    async def api_alerts(request):
+        terminal_id = request.query_params.get("terminal_id")
+        scope = request.query_params.get("scope")
+        return JSONResponse(manager.list_alerts(scope, terminal_id))
+
+    async def api_alert_create(request: Request):
+        body = await request.json()
+        scope = str(body.get("scope", "session")).strip()
+        pattern = str(body.get("pattern", "")).strip()
+        label = str(body.get("label", "")).strip() or None
+        terminal_id = body.get("terminal_id")
+        if not pattern:
+            return JSONResponse({"error": "pattern cannot be empty"}, status_code=400)
+        try:
+            return JSONResponse(manager.add_alert(scope, pattern, terminal_id, label))
+        except ValueError as e:
+            return JSONResponse({"error": str(e)}, status_code=400)
+
+    async def api_alert_remove(request: Request):
+        alert_id = request.path_params["alert_id"]
+        return JSONResponse({"removed": manager.remove_alert(alert_id), "alert_id": alert_id})
+
+    async def api_alert_events(request):
+        terminal_id = request.query_params.get("terminal_id")
+        since = int(request.query_params.get("since", 0))
+        return JSONResponse(manager.list_alert_events(terminal_id, since))
+
+    async def api_checkpoints(request):
+        terminal_id = request.query_params.get("terminal_id")
+        if request.method == "GET":
+            return JSONResponse(manager.list_checkpoints(terminal_id))
+        body = await request.json()
+        terminal_id = str(body.get("terminal_id", "")).strip()
+        label = str(body.get("label", "")).strip()
+        note = str(body.get("note", "")).strip() or None
+        if not terminal_id or not label:
+            return JSONResponse({"error": "terminal_id and label are required"}, status_code=400)
+        try:
+            return JSONResponse(manager.add_checkpoint(terminal_id, label, note, body.get("cursor")))
+        except KeyError:
+            return JSONResponse({"error": "terminal not found"}, status_code=404)
+
+    async def api_checkpoint_remove(request: Request):
+        checkpoint_id = request.path_params["checkpoint_id"]
+        return JSONResponse({"removed": manager.remove_checkpoint(checkpoint_id), "checkpoint_id": checkpoint_id})
+
+    async def api_export(request):
+        terminal_id = request.path_params["terminal_id"]
+        try:
+            return JSONResponse(manager.export_session(terminal_id))
+        except KeyError:
+            return JSONResponse({"error": "terminal not found"}, status_code=404)
+
+    async def api_import(request: Request):
+        body = await request.json()
+        snapshot = body.get("snapshot")
+        if not isinstance(snapshot, dict):
+            return JSONResponse({"error": "snapshot must be an object"}, status_code=400)
+        try:
+            return JSONResponse(await manager.import_session(snapshot, body.get("terminal_id")))
+        except ValueError as e:
+            return JSONResponse({"error": str(e)}, status_code=400)
+
     async def api_send(request: Request):
         terminal_id = request.path_params["terminal_id"]
         body = await request.json()
@@ -397,8 +907,27 @@ def create_app(manager):
         Route("/api/terminals", api_terminals),
         Route("/api/create", api_create, methods=["POST"]),
         Route("/api/status/{terminal_id}", api_status),
+        Route("/api/profile/{terminal_id}", api_profile),
+        Route("/api/profile/{terminal_id}", api_profile_update, methods=["POST"]),
         Route("/api/kill/{terminal_id}", api_kill, methods=["POST"]),
         Route("/api/history/{terminal_id}", api_history),
         Route("/api/search/{terminal_id}", api_search),
+        Route("/api/health", api_health),
+        Route("/api/workspaces", api_workspaces),
+        Route("/api/workspaces", api_workspace_create, methods=["POST"]),
+        Route("/api/workspaces/{workspace_id}", api_workspace_item),
+        Route("/api/workspaces/{workspace_id}", api_workspace_update, methods=["POST"]),
+        Route("/api/workspaces/{workspace_id}/members", api_workspace_add_member, methods=["POST"]),
+        Route("/api/workspaces/{workspace_id}/members/{terminal_id}", api_workspace_remove_member, methods=["DELETE"]),
+        Route("/api/workspaces/{workspace_id}/apply", api_workspace_apply, methods=["POST"]),
+        Route("/api/alerts", api_alerts),
+        Route("/api/alerts", api_alert_create, methods=["POST"]),
+        Route("/api/alerts/{alert_id}", api_alert_remove, methods=["DELETE"]),
+        Route("/api/alert-events", api_alert_events),
+        Route("/api/checkpoints", api_checkpoints),
+        Route("/api/checkpoints", api_checkpoints, methods=["POST"]),
+        Route("/api/checkpoints/{checkpoint_id}", api_checkpoint_remove, methods=["DELETE"]),
+        Route("/api/export/{terminal_id}", api_export),
+        Route("/api/import", api_import, methods=["POST"]),
         Route("/api/send/{terminal_id}", api_send, methods=["POST"]),
     ])
