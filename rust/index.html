@@ -3,195 +3,547 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>i4z-terminal-mcp</title>
+<title>i4z · terminal</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
 <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.js"></script>
 <style>
+/* ── Reset ─────────────────────────────────────────────────────── */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+/* ── Variables ─────────────────────────────────────────────────── */
 :root{
-  --bg:#0d1117;--fg:#c9d1d9;--sidebar:#161b22;--panel:#11151b;
-  --border:#30363d;--accent:#58a6ff;--accent-strong:#1f6feb;
-  --muted:#8b949e;--muted-2:#484f58;--hover:#1f2937;--input:#0d1117;
-  --button:#21262d;--button-hover:#30363d;--success:#3fb950;--danger:#f85149;
-  --warning:#d29922;--tab-active:#161b22;--tab-bg:#0d1117;
-  --sidebar-w:240px;--right-w:300px;--hdr-h:48px;
+  --bg:         #171512;
+  --surface:    #201e1a;
+  --surface-2:  #282420;
+  --surface-3:  #302c28;
+  --border:     #2e2c28;
+  --border-2:   #3a3632;
+  --fg:         #ede8e0;
+  --fg-2:       #9a9288;
+  --fg-3:       #655f58;
+  --accent:     #c4a0f0;
+  --accent-fg:  #ffffff;
+  --accent-bg:  #3d2870;
+  --accent-hover:#4a3485;
+  --success:    #78c490;
+  --danger:     #e86868;
+  --warning:    #d4983a;
+  --info:       #88c0d8;
+  --sidebar-w:  248px;
+  --right-w:    308px;
+  --hdr-h:      48px;
 }
 body[data-theme="light"]{
-  --bg:#f6f8fa;--fg:#24292f;--sidebar:#ffffff;--panel:#ffffff;
-  --border:#d0d7de;--accent:#0969da;--accent-strong:#0969da;
-  --muted:#6e7781;--muted-2:#8c959f;--hover:#eaeef2;--input:#ffffff;
-  --button:#f6f8fa;--button-hover:#eaeef2;--success:#1a7f37;--danger:#cf222e;
-  --tab-active:#ffffff;--tab-bg:#f6f8fa;
+  --bg:         #f7f4f0;
+  --surface:    #ffffff;
+  --surface-2:  #ece8e0;
+  --surface-3:  #e0dbd4;
+  --border:     #d5cfc8;
+  --border-2:   #c5bdb4;
+  --fg:         #26201a;
+  --fg-2:       #6c6058;
+  --fg-3:       #9a9088;
+  --accent:     #7c40c8;
+  --accent-fg:  #ffffff;
+  --accent-bg:  #7c40c8;
+  --accent-hover:#6a30aa;
+  --success:    #2a8a58;
+  --danger:     #c83030;
+  --warning:    #946018;
+  --info:       #2878a8;
 }
-html,body{height:100%;overflow:hidden}
-body{display:flex;flex-direction:column;font-family:monospace;background:var(--bg);color:var(--fg)}
 
-/* ── Header ── */
-#header{height:var(--hdr-h);flex-shrink:0;display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid var(--border);background:var(--sidebar)}
-#header .brand{font-size:13px;font-weight:bold;color:var(--accent);flex-shrink:0;margin-right:4px}
-#health-dot{width:8px;height:8px;border-radius:50%;background:var(--muted-2);flex-shrink:0;cursor:help}
-#health-dot.ok{background:var(--success)}
-#health-dot.warn{background:var(--warning)}
-#health-dot.bad{background:var(--danger)}
-#health-text{font-size:10px;color:var(--muted);flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;min-width:0}
-.hdr-btn{background:var(--button);border:1px solid var(--border);color:var(--fg);font-family:monospace;font-size:11px;padding:5px 9px;border-radius:4px;cursor:pointer;white-space:nowrap;flex-shrink:0;min-height:30px;touch-action:manipulation}
-.hdr-btn:hover{background:var(--button-hover)}
-.hdr-btn.active{background:var(--accent-strong);color:#fff;border-color:var(--accent-strong)}
+/* ── Base ───────────────────────────────────────────────────────── */
+html,body{height:100%;overflow:hidden}
+body{
+  display:flex;flex-direction:column;
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+  font-size:13px;line-height:1.4;
+  background:var(--bg);color:var(--fg);
+}
+
+/* ── Header ─────────────────────────────────────────────────────── */
+#header{
+  height:var(--hdr-h);flex-shrink:0;
+  display:flex;align-items:center;gap:8px;
+  padding:0 14px;
+  border-bottom:1px solid var(--border);
+  background:var(--surface);
+}
+.brand{
+  font-size:14px;font-weight:600;
+  color:var(--accent);letter-spacing:-.01em;flex-shrink:0;
+}
+#server-version{
+  font-size:11px;color:var(--fg-3);font-family:monospace;
+  background:var(--surface-2);border:1px solid var(--border);
+  padding:2px 6px;border-radius:4px;flex-shrink:0;
+}
+#health-pip{
+  width:7px;height:7px;border-radius:50%;
+  background:var(--fg-3);flex-shrink:0;cursor:help;
+  transition:background .3s;
+}
+#health-pip.ok{background:var(--success)}
+#health-pip.warn{background:var(--warning)}
+#health-pip.bad{background:var(--danger)}
+#health-text{
+  font-size:11px;color:var(--fg-3);
+  flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;min-width:0;
+}
+.hdr-spacer{flex:1}
+.hdr-btn{
+  background:var(--surface-2);border:1px solid var(--border);
+  color:var(--fg-2);
+  font-family:inherit;font-size:11px;font-weight:500;
+  padding:5px 10px;border-radius:6px;cursor:pointer;
+  white-space:nowrap;flex-shrink:0;min-height:30px;
+  transition:background .12s,color .12s,border-color .12s;
+  touch-action:manipulation;
+}
+.hdr-btn:hover{background:var(--surface-3);color:var(--fg);border-color:var(--border-2)}
+.hdr-btn.active{background:var(--accent-bg);color:var(--accent);border-color:var(--accent-bg)}
 #hamburger-btn{font-size:16px;padding:5px 9px;display:none}
 
-/* ── App body ── */
+/* ── App body ───────────────────────────────────────────────────── */
 #app-body{flex:1;display:flex;overflow:hidden;min-height:0}
 
-/* ── Resize handles ── */
-.resize-handle{width:4px;background:var(--border);cursor:col-resize;flex-shrink:0;transition:background .12s;position:relative;touch-action:none}
-.resize-handle::after{content:'';position:absolute;inset:0 -4px}
+/* ── Resize handles ─────────────────────────────────────────────── */
+.resize-handle{
+  width:3px;background:var(--border);cursor:col-resize;
+  flex-shrink:0;transition:background .12s;position:relative;touch-action:none;
+}
+.resize-handle::after{content:'';position:absolute;inset:0 -5px}
 .resize-handle:hover,.resize-handle.dragging{background:var(--accent)}
 
-/* ── Sidebar ── */
-#sidebar{width:var(--sidebar-w);flex-shrink:0;background:var(--sidebar);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;transition:transform .25s ease}
-#sidebar h2{padding:12px 14px;font-size:11px;color:var(--accent);border-bottom:1px solid var(--border);flex-shrink:0;letter-spacing:.06em;text-transform:uppercase}
-#new-term-bar{display:flex;gap:6px;padding:8px 10px;border-bottom:1px solid var(--border);flex-shrink:0}
-#new-term-name{flex:1;background:var(--input);border:1px solid var(--border);color:var(--fg);font-family:monospace;font-size:12px;padding:7px 8px;border-radius:4px;outline:none;min-width:0;touch-action:manipulation}
+/* ── Sidebar ────────────────────────────────────────────────────── */
+#sidebar{
+  width:var(--sidebar-w);flex-shrink:0;
+  background:var(--surface);
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;overflow:hidden;
+  transition:transform .22s ease;
+}
+#sidebar-title{
+  padding:11px 14px 10px;
+  display:flex;align-items:center;gap:6px;
+  border-bottom:1px solid var(--border);flex-shrink:0;
+}
+#sidebar-title .stitle{
+  font-size:11px;font-weight:600;text-transform:uppercase;
+  letter-spacing:.07em;color:var(--fg-3);flex:1;
+}
+#term-count-badge{
+  font-size:10px;color:var(--fg-3);
+  background:var(--surface-2);border:1px solid var(--border);
+  padding:1px 6px;border-radius:10px;
+}
+#new-term-bar{
+  display:flex;gap:6px;padding:8px 10px;
+  border-bottom:1px solid var(--border);flex-shrink:0;
+}
+#new-term-name{
+  flex:1;background:var(--surface-2);
+  border:1px solid var(--border);color:var(--fg);
+  font-family:inherit;font-size:12px;
+  padding:7px 9px;border-radius:6px;outline:none;min-width:0;
+  transition:border-color .12s;touch-action:manipulation;
+}
+#new-term-name::placeholder{color:var(--fg-3)}
 #new-term-name:focus{border-color:var(--accent)}
-#new-term-btn{background:var(--accent-strong);border:none;color:#fff;font-family:monospace;font-size:16px;min-width:32px;border-radius:4px;cursor:pointer;flex-shrink:0;touch-action:manipulation}
-#new-term-btn:hover{filter:brightness(1.15)}
-#term-list{flex:1;overflow-y:auto;padding:6px;-webkit-overflow-scrolling:touch}
-.term-item{padding:10px 10px;cursor:pointer;border-radius:5px;font-size:12px;margin:2px 0;display:flex;align-items:center;gap:8px;min-height:44px;touch-action:manipulation}
-.term-item:hover{background:var(--hover)}
-.term-item.active{background:var(--accent-strong);color:#fff}
-.term-item.in-tab{background:var(--hover)}
-.sdot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+#new-term-btn{
+  background:var(--accent-bg);border:none;color:var(--accent);
+  font-size:18px;font-weight:300;line-height:1;
+  min-width:34px;height:34px;border-radius:6px;
+  cursor:pointer;flex-shrink:0;touch-action:manipulation;
+  transition:filter .12s;display:flex;align-items:center;justify-content:center;
+}
+#new-term-btn:hover{filter:brightness(1.2)}
+#term-list{flex:1;overflow-y:auto;padding:5px}
+.term-item{
+  padding:8px 10px;cursor:pointer;border-radius:7px;
+  margin:2px 0;display:flex;align-items:center;gap:8px;
+  min-height:42px;touch-action:manipulation;
+  transition:background .1s;position:relative;
+}
+.term-item:hover{background:var(--surface-2)}
+.term-item.active{background:var(--accent-bg)}
+.term-item.active .term-label{color:var(--accent)}
+.term-item.in-tab{background:var(--surface-3)}
+.sdot{
+  width:7px;height:7px;border-radius:50%;flex-shrink:0;
+  transition:background .3s;
+}
 .sdot.on{background:var(--success)}
 .sdot.off{background:var(--danger)}
-.term-label{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.term-info{flex:1;min-width:0}
-.rename-input{flex:1;background:var(--input);border:1px solid var(--accent);color:var(--fg);font-family:monospace;font-size:12px;padding:2px 6px;border-radius:3px;outline:none;min-width:0}
-#sidebar-footer{padding:6px 10px;border-top:1px solid var(--border);font-size:10px;color:var(--muted-2);flex-shrink:0}
+.sdot.unknown{background:var(--fg-3)}
+.term-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.term-label{
+  font-size:12px;font-weight:500;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  color:var(--fg);
+}
+.term-meta{font-size:10px;color:var(--fg-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.term-actions{
+  display:flex;gap:2px;opacity:0;flex-shrink:0;
+  transition:opacity .12s;
+}
+.term-item:hover .term-actions{opacity:1}
+.term-item.active .term-actions{opacity:.7}
+.term-item.active .term-actions:hover{opacity:1}
+.ta-btn{
+  background:none;border:none;cursor:pointer;
+  font-size:11px;padding:3px 5px;border-radius:4px;
+  color:var(--fg-3);line-height:1;transition:background .1s,color .1s;
+  touch-action:manipulation;min-width:22px;min-height:22px;
+  display:flex;align-items:center;justify-content:center;
+}
+.ta-btn:hover{background:var(--surface-3);color:var(--fg)}
+.ta-btn.danger:hover{background:var(--danger);color:#fff}
+.ta-btn.warn:hover{background:var(--warning);color:#fff}
+.rename-input{
+  flex:1;background:var(--bg);border:1px solid var(--accent);
+  color:var(--fg);font-family:inherit;font-size:12px;
+  padding:3px 7px;border-radius:4px;outline:none;min-width:0;
+}
+#sidebar-footer{
+  padding:7px 12px;border-top:1px solid var(--border);
+  font-size:10px;color:var(--fg-3);flex-shrink:0;
+  display:flex;align-items:center;gap:6px;
+}
+#sidebar-url{
+  flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  cursor:pointer;
+}
+#sidebar-url:hover{color:var(--fg-2)}
 
-/* ── Center ── */
+/* ── Center ─────────────────────────────────────────────────────── */
 #center{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
-#tab-bar{display:flex;align-items:stretch;background:var(--tab-bg);border-bottom:1px solid var(--border);flex-shrink:0;min-height:38px;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch}
-#tab-bar::-webkit-scrollbar{height:3px}
-#tab-bar::-webkit-scrollbar-thumb{background:var(--border)}
-.tab{display:flex;align-items:center;gap:6px;padding:0 12px;cursor:pointer;border-right:1px solid var(--border);font-size:12px;white-space:nowrap;background:var(--tab-bg);color:var(--muted);min-height:38px;flex-shrink:0;border-bottom:2px solid transparent;touch-action:manipulation}
-.tab:hover{background:var(--hover);color:var(--fg)}
-.tab.active{background:var(--tab-active);color:var(--fg);border-bottom-color:var(--accent)}
-.tab .tab-dot{width:6px;height:6px;border-radius:50%;background:var(--success);flex-shrink:0}
-.tab .tab-dot.off{background:var(--danger)}
-.tab-close{background:none;border:none;color:inherit;cursor:pointer;padding:4px;border-radius:3px;font-size:13px;opacity:.5;line-height:1;touch-action:manipulation;min-width:24px;min-height:24px}
-.tab-close:hover{opacity:1;background:var(--button)}
-.term-del{background:none;border:none;color:inherit;cursor:pointer;padding:3px 5px;border-radius:3px;font-size:12px;opacity:0;margin-left:auto;touch-action:manipulation;line-height:1;flex-shrink:0}
-.term-item:hover .term-del{opacity:.4}
-.term-del:hover{opacity:1!important;color:var(--danger)}
-#tab-placeholder{display:flex;align-items:center;padding:0 14px;font-size:12px;color:var(--muted-2)}
-#terminals-wrap{flex:1;display:flex;overflow:hidden;position:relative}
-.term-pane{flex:1;display:none;flex-direction:column;overflow:hidden;min-width:0}
+
+/* Tab bar */
+#tab-bar{
+  display:flex;align-items:stretch;
+  background:var(--surface);border-bottom:1px solid var(--border);
+  flex-shrink:0;min-height:36px;
+  overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;
+}
+#tab-bar::-webkit-scrollbar{height:2px}
+#tab-bar::-webkit-scrollbar-thumb{background:var(--border-2)}
+.tab{
+  display:flex;align-items:center;gap:5px;
+  padding:0 12px;cursor:pointer;
+  border-right:1px solid var(--border);
+  font-size:12px;font-weight:500;white-space:nowrap;
+  background:var(--surface);color:var(--fg-3);
+  min-height:36px;flex-shrink:0;
+  border-bottom:2px solid transparent;
+  transition:background .1s,color .1s;touch-action:manipulation;
+}
+.tab:hover{background:var(--surface-2);color:var(--fg)}
+.tab.active{background:var(--bg);color:var(--fg);border-bottom-color:var(--accent)}
+.tab-dot{width:6px;height:6px;border-radius:50%;background:var(--success);flex-shrink:0}
+.tab-dot.off{background:var(--danger)}
+.tab-close{
+  background:none;border:none;color:inherit;cursor:pointer;
+  padding:3px 4px;border-radius:3px;font-size:13px;
+  opacity:.4;line-height:1;touch-action:manipulation;
+  min-width:22px;min-height:22px;
+}
+.tab-close:hover{opacity:1;background:var(--surface-3)}
+#tab-placeholder{
+  display:flex;align-items:center;padding:0 16px;
+  font-size:12px;color:var(--fg-3);
+}
+
+/* Info bar */
+#info-bar{
+  display:none;
+  height:26px;flex-shrink:0;
+  padding:0 12px;
+  border-bottom:1px solid var(--border);
+  background:var(--surface);
+  font-size:11px;color:var(--fg-3);
+  align-items:center;gap:8px;font-family:monospace;
+  overflow:hidden;
+}
+#info-bar.visible{display:flex}
+#infobar-id{font-weight:600;color:var(--fg-2)}
+#infobar-status{}
+#infobar-size{}
+.infobar-sep{color:var(--border-2)}
+.infobar-spacer{flex:1}
+.ib-btn{
+  background:none;border:1px solid var(--border);
+  color:var(--fg-3);font-family:monospace;font-size:10px;
+  padding:2px 7px;border-radius:4px;cursor:pointer;
+  transition:background .1s,color .1s,border-color .1s;
+  touch-action:manipulation;
+}
+.ib-btn:hover{background:var(--surface-2);color:var(--fg);border-color:var(--border-2)}
+.ib-btn.danger:hover{background:var(--danger);border-color:var(--danger);color:#fff}
+
+/* Terminals wrap */
+#terminals-wrap{
+  flex:1;display:flex;overflow:hidden;position:relative;min-height:0;
+}
+.term-pane{
+  flex:1;display:none;flex-direction:column;overflow:hidden;min-width:0;
+}
 .term-pane.visible{display:flex}
 .term-pane.split{flex:none;width:50%}
 .term-pane+.term-pane.split{border-left:1px solid var(--border)}
-.xterm-container{flex:1;overflow:hidden;padding:4px}
+.xterm-container{flex:1;overflow:hidden;padding:3px}
 .xterm-container .xterm{height:100%}
-#empty-state{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;color:var(--muted-2)}
-#empty-state h3{font-size:16px;color:var(--muted)}
-#empty-state p{font-size:12px}
-#cmd-bar{display:none;padding:6px 10px;border-top:1px solid var(--border);background:var(--sidebar);flex-shrink:0;gap:6px;align-items:center;flex-wrap:wrap}
-#cmd-bar.visible{display:flex}
-#cmd-prompt{color:var(--accent);font-size:13px;flex-shrink:0}
-#cmd-input{flex:1;min-width:120px;background:var(--input);border:1px solid var(--border);color:var(--fg);font-family:monospace;font-size:16px;padding:8px 10px;border-radius:4px;outline:none;touch-action:manipulation}
-#cmd-input:focus{border-color:var(--accent)}
-.ctrl-btn{background:var(--button);border:1px solid var(--border);color:var(--fg);font-family:monospace;font-size:11px;padding:7px 9px;border-radius:4px;cursor:pointer;flex-shrink:0;min-height:36px;touch-action:manipulation}
-.ctrl-btn:hover{background:var(--button-hover)}
 
-/* ── Right panel ── */
-#right-panel{width:var(--right-w);flex-shrink:0;background:var(--sidebar);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;transition:transform .25s ease}
+/* Empty state */
+#empty-state{
+  flex:1;display:flex;align-items:center;justify-content:center;
+  flex-direction:column;gap:14px;color:var(--fg-3);padding:20px;text-align:center;
+}
+#empty-state .es-icon{font-size:36px;opacity:.4}
+#empty-state h3{font-size:15px;font-weight:500;color:var(--fg-2)}
+#empty-state p{font-size:12px;line-height:1.6;max-width:280px}
+#empty-state kbd{
+  display:inline-block;background:var(--surface-2);border:1px solid var(--border-2);
+  border-radius:4px;padding:1px 5px;font-family:monospace;font-size:11px;color:var(--fg-2);
+}
+
+/* Command bar */
+#cmd-bar{
+  display:none;padding:7px 10px;
+  border-top:1px solid var(--border);background:var(--surface);
+  flex-shrink:0;gap:5px;align-items:center;flex-wrap:nowrap;
+}
+#cmd-bar.visible{display:flex}
+#cmd-prompt{color:var(--accent);font-family:monospace;font-size:13px;flex-shrink:0}
+#cmd-input{
+  flex:1;min-width:0;
+  background:var(--surface-2);border:1px solid var(--border);
+  color:var(--fg);font-family:monospace;font-size:13px;
+  padding:7px 10px;border-radius:6px;outline:none;
+  transition:border-color .12s;touch-action:manipulation;
+}
+#cmd-input::placeholder{color:var(--fg-3)}
+#cmd-input:focus{border-color:var(--accent)}
+#cmd-input:disabled{opacity:.5}
+.ctrl-btn{
+  background:var(--surface-2);border:1px solid var(--border);
+  color:var(--fg-2);font-family:inherit;font-size:11px;font-weight:500;
+  padding:6px 9px;border-radius:6px;cursor:pointer;flex-shrink:0;
+  min-height:34px;touch-action:manipulation;
+  transition:background .1s,color .1s;
+}
+.ctrl-btn:hover{background:var(--surface-3);color:var(--fg)}
+
+/* ── Right panel ─────────────────────────────────────────────────── */
+#right-panel{
+  width:var(--right-w);flex-shrink:0;
+  background:var(--surface);border-left:1px solid var(--border);
+  display:flex;flex-direction:column;overflow:hidden;
+  transition:transform .22s ease;
+}
 body.panel-hidden #right-panel{display:none}
 body.panel-hidden #resize-right-handle{display:none}
-#panel-tabs{display:flex;border-bottom:1px solid var(--border);background:var(--bg);flex-shrink:0;overflow-x:auto}
+#panel-tabs{
+  display:flex;border-bottom:1px solid var(--border);
+  background:var(--surface);flex-shrink:0;overflow-x:auto;
+}
 #panel-tabs::-webkit-scrollbar{height:0}
-.ptab{background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-family:monospace;font-size:11px;padding:9px 10px;cursor:pointer;white-space:nowrap;flex-shrink:0;min-height:38px;touch-action:manipulation}
-.ptab:hover{color:var(--fg)}
+.ptab{
+  background:none;border:none;border-bottom:2px solid transparent;
+  color:var(--fg-3);font-family:inherit;font-size:11px;font-weight:500;
+  padding:9px 10px;cursor:pointer;white-space:nowrap;
+  flex-shrink:0;min-height:36px;touch-action:manipulation;
+  transition:color .12s;
+}
+.ptab:hover{color:var(--fg-2)}
 .ptab.active{color:var(--accent);border-bottom-color:var(--accent)}
-#panel-body{flex:1;overflow-y:auto;padding:10px;-webkit-overflow-scrolling:touch}
+#panel-body{flex:1;overflow-y:auto;padding:12px}
 .panel-section{display:none}
 .panel-section.active{display:block}
-.section-title{font-size:11px;color:var(--accent);font-weight:bold;letter-spacing:.05em;text-transform:uppercase;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid var(--border)}
-.field-row{display:flex;gap:6px;margin-bottom:6px;align-items:center;flex-wrap:wrap}
-.field-row label{font-size:11px;color:var(--muted);flex-shrink:0}
-.p-input{background:var(--input);border:1px solid var(--border);color:var(--fg);font-family:monospace;font-size:11px;padding:6px 7px;border-radius:4px;outline:none;flex:1;min-width:0;min-height:32px;touch-action:manipulation}
-.p-input:focus{border-color:var(--accent)}
-.p-textarea{background:var(--input);border:1px solid var(--border);color:var(--fg);font-family:monospace;font-size:11px;padding:6px 7px;border-radius:4px;outline:none;width:100%;resize:vertical;min-height:52px}
-.p-textarea:focus{border-color:var(--accent)}
-.p-btn{background:var(--button);border:1px solid var(--border);color:var(--fg);font-family:monospace;font-size:11px;padding:6px 8px;border-radius:4px;cursor:pointer;flex-shrink:0;min-height:32px;touch-action:manipulation}
-.p-btn:hover{background:var(--button-hover)}
-.p-btn:disabled{opacity:.5;cursor:not-allowed}
-.p-pre{white-space:pre-wrap;word-break:break-word;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:6px;font-size:10px;max-height:110px;overflow:auto;margin-top:4px;color:var(--fg)}
-.list-box{display:flex;flex-direction:column;gap:3px;max-height:130px;overflow-y:auto;margin-top:4px}
-.list-row{display:flex;justify-content:space-between;align-items:center;gap:6px;border:1px solid var(--border);border-radius:4px;padding:5px 7px;font-size:10px}
-.list-row .lname{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.list-row button{background:none;border:1px solid var(--border);color:var(--danger);font-family:monospace;font-size:9px;padding:3px 6px;border-radius:3px;cursor:pointer;touch-action:manipulation}
-.list-row button:hover{background:var(--danger);color:#fff}
-.muted{color:var(--muted-2);font-size:10px;padding:4px 0}
-.alert-badge{background:var(--danger);color:#fff;border-radius:10px;font-size:9px;padding:1px 5px;margin-left:4px}
-.subsection{margin-top:10px}
-.subsection .section-title{margin-top:0}
 
-/* ── Overlay (mobile drawer backdrop) ── */
-#overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.48);z-index:150;touch-action:manipulation}
+/* Panel components */
+.section-title{
+  font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;
+  color:var(--fg-3);margin-bottom:10px;padding-bottom:5px;
+  border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px;
+}
+.section-title .badge{
+  font-size:10px;background:var(--danger);color:#fff;
+  border-radius:8px;padding:1px 5px;font-weight:600;letter-spacing:0;
+  text-transform:none;
+}
+.field-row{display:flex;gap:5px;margin-bottom:7px;align-items:center;flex-wrap:wrap}
+.field-row label{font-size:11px;color:var(--fg-3);flex-shrink:0}
+.p-input{
+  background:var(--surface-2);border:1px solid var(--border);
+  color:var(--fg);font-family:inherit;font-size:12px;
+  padding:6px 8px;border-radius:6px;outline:none;
+  flex:1;min-width:0;min-height:30px;touch-action:manipulation;
+  transition:border-color .12s;
+}
+.p-input::placeholder{color:var(--fg-3)}
+.p-input:focus{border-color:var(--accent)}
+.p-textarea{
+  background:var(--surface-2);border:1px solid var(--border);
+  color:var(--fg);font-family:monospace;font-size:11px;
+  padding:7px 8px;border-radius:6px;outline:none;
+  width:100%;resize:vertical;min-height:54px;
+  transition:border-color .12s;
+}
+.p-textarea::placeholder{color:var(--fg-3)}
+.p-textarea:focus{border-color:var(--accent)}
+.p-select{
+  background:var(--surface-2);border:1px solid var(--border);
+  color:var(--fg);font-family:inherit;font-size:12px;
+  padding:5px 8px;border-radius:6px;outline:none;
+  min-height:30px;flex:1;cursor:pointer;
+}
+.p-btn{
+  background:var(--surface-2);border:1px solid var(--border);
+  color:var(--fg-2);font-family:inherit;font-size:11px;font-weight:500;
+  padding:5px 9px;border-radius:6px;cursor:pointer;
+  flex-shrink:0;min-height:30px;touch-action:manipulation;
+  transition:background .1s,color .1s,border-color .1s;
+}
+.p-btn:hover{background:var(--surface-3);color:var(--fg);border-color:var(--border-2)}
+.p-btn:disabled{opacity:.4;cursor:not-allowed}
+.p-btn.primary{background:var(--accent-bg);color:var(--accent);border-color:var(--accent-bg)}
+.p-btn.primary:hover{filter:brightness(1.15)}
+.p-btn.danger{color:var(--danger)}
+.p-btn.danger:hover{background:var(--danger);color:#fff;border-color:var(--danger)}
+.p-pre{
+  white-space:pre-wrap;word-break:break-all;
+  background:var(--bg);border:1px solid var(--border);
+  border-radius:6px;padding:8px;font-size:10px;font-family:monospace;
+  max-height:120px;overflow:auto;margin-top:4px;color:var(--fg-2);
+  line-height:1.5;
+}
+.list-box{
+  display:flex;flex-direction:column;gap:2px;
+  max-height:140px;overflow-y:auto;margin-top:4px;
+}
+.list-row{
+  display:flex;align-items:center;gap:6px;
+  border:1px solid var(--border);border-radius:6px;
+  padding:5px 8px;font-size:11px;
+  background:var(--bg);
+  transition:border-color .1s;
+}
+.list-row:hover{border-color:var(--border-2)}
+.list-row .lname{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--fg-2)}
+.list-row .lmeta{font-size:10px;color:var(--fg-3);flex-shrink:0}
+.list-row .ldel{
+  background:none;border:1px solid var(--border);color:var(--fg-3);
+  font-family:monospace;font-size:10px;padding:2px 6px;border-radius:4px;
+  cursor:pointer;flex-shrink:0;touch-action:manipulation;
+  transition:background .1s,color .1s;
+}
+.list-row .ldel:hover{background:var(--danger);border-color:var(--danger);color:#fff}
+.empty-note{color:var(--fg-3);font-size:11px;padding:6px 0}
+.subsection{margin-top:14px}
+.gap-4{gap:4px!important}
+.mt-8{margin-top:8px}
+.mt-4{margin-top:4px}
+
+/* Search results */
+.search-result{
+  border:1px solid var(--border);border-radius:6px;
+  padding:7px 9px;margin-bottom:4px;font-size:11px;
+  background:var(--bg);cursor:default;
+}
+.search-result .sr-text{
+  font-family:monospace;color:var(--fg);word-break:break-all;
+  white-space:pre-wrap;margin-top:3px;font-size:10px;
+}
+.search-result .sr-meta{font-size:10px;color:var(--fg-3)}
+.sr-highlight{background:var(--warning);color:var(--bg);border-radius:2px;padding:0 1px}
+
+/* ── Toasts ──────────────────────────────────────────────────────── */
+#toast-rack{
+  position:fixed;bottom:16px;right:16px;z-index:999;
+  display:flex;flex-direction:column-reverse;gap:6px;
+  pointer-events:none;
+}
+.toast{
+  display:flex;align-items:flex-start;gap:8px;
+  background:var(--surface-2);border:1px solid var(--border-2);
+  border-radius:8px;padding:9px 12px;
+  font-size:12px;line-height:1.4;min-width:200px;max-width:340px;
+  pointer-events:all;cursor:pointer;
+  box-shadow:0 4px 16px rgba(0,0,0,.4);
+  opacity:0;transform:translateY(8px) scale(.97);
+  transition:opacity .2s,transform .2s;
+}
+.toast.visible{opacity:1;transform:none}
+.toast.hiding{opacity:0;transform:translateY(8px) scale(.97)}
+.toast-icon{font-size:13px;flex-shrink:0;margin-top:1px}
+.toast-msg{flex:1;word-break:break-word}
+.toast-info .toast-icon{color:var(--info)}
+.toast-success .toast-icon{color:var(--success)}
+.toast-error .toast-icon{color:var(--danger)}
+.toast-warn .toast-icon{color:var(--warning)}
+.toast-info{border-left:3px solid var(--info)}
+.toast-success{border-left:3px solid var(--success)}
+.toast-error{border-left:3px solid var(--danger)}
+.toast-warn{border-left:3px solid var(--warning)}
+
+/* ── Overlay ─────────────────────────────────────────────────────── */
+#overlay{
+  display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,.5);z-index:150;
+  touch-action:manipulation;
+}
 #overlay.visible{display:block}
 
-/* ── Responsive: Tablet (640–1023px) ── */
+/* ── Scrollbars ──────────────────────────────────────────────────── */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-thumb{background:var(--border-2);border-radius:3px}
+::-webkit-scrollbar-track{background:transparent}
+.xterm-viewport{overflow-y:auto!important}
+
+/* ── Responsive: Tablet 640–1023 ─────────────────────────────────── */
 @media(max-width:1023px){
   #right-panel{
     position:fixed;right:0;top:var(--hdr-h);bottom:0;
-    width:min(var(--right-w),85vw);
-    z-index:200;
-    transform:translateX(calc(min(var(--right-w),85vw) + 4px));
-    box-shadow:-4px 0 20px rgba(0,0,0,.35);
-    border-left:1px solid var(--border);
+    width:min(var(--right-w),88vw);z-index:200;
+    transform:translateX(calc(min(var(--right-w),88vw) + 4px));
+    box-shadow:-4px 0 24px rgba(0,0,0,.4);
   }
-  body.panel-hidden #right-panel{display:flex;transform:translateX(calc(min(var(--right-w),85vw) + 4px))}
+  body.panel-hidden #right-panel{display:flex;transform:translateX(calc(min(var(--right-w),88vw) + 4px))}
   #right-panel.drawer-open{transform:translateX(0)!important}
   #resize-right-handle{display:none}
 }
 
-/* ── Responsive: Mobile (<640px) ── */
+/* ── Responsive: Mobile <640 ─────────────────────────────────────── */
 @media(max-width:639px){
-  :root{--sidebar-w:82vw;--right-w:100vw}
+  :root{--sidebar-w:84vw;--right-w:100vw}
   #hamburger-btn{display:flex;align-items:center;justify-content:center}
   #health-text{display:none}
+  #server-version{display:none}
   #sidebar{
     position:fixed;left:0;top:var(--hdr-h);bottom:0;
-    width:var(--sidebar-w);
-    z-index:200;
+    width:var(--sidebar-w);z-index:200;
     transform:translateX(calc(-1 * var(--sidebar-w) - 4px));
-    box-shadow:4px 0 20px rgba(0,0,0,.35);
+    box-shadow:4px 0 24px rgba(0,0,0,.4);
   }
   #sidebar.drawer-open{transform:translateX(0)}
   #resize-sidebar-handle{display:none}
   #right-panel{
     position:fixed;left:0;right:0;bottom:0;
-    width:100%!important;height:56vh;
+    width:100%!important;height:58vh;
     border-left:none;border-top:1px solid var(--border);
-    transform:translateY(calc(56vh + 4px));
-    box-shadow:0 -4px 20px rgba(0,0,0,.35);
+    transform:translateY(calc(58vh + 4px));
+    box-shadow:0 -4px 24px rgba(0,0,0,.4);
   }
-  body.panel-hidden #right-panel{display:flex;transform:translateY(calc(56vh + 4px))}
+  body.panel-hidden #right-panel{display:flex;transform:translateY(calc(58vh + 4px))}
   #right-panel.drawer-open{transform:translateY(0)!important}
   #resize-right-handle{display:none}
-  #cmd-bar{flex-wrap:wrap;padding:6px 8px;gap:4px}
-  #cmd-input{font-size:16px;min-width:0}
+  #cmd-bar{flex-wrap:wrap;gap:4px}
+  #cmd-input{font-size:16px}
   .hdr-btn:not(#hamburger-btn):not(#theme-btn){display:none}
-  #theme-btn{font-size:10px;padding:5px 7px}
-  .tab-close{min-width:28px;min-height:28px;font-size:14px}
-  .term-item{min-height:48px;padding:10px 12px}
 }
-
-/* scrollbars */
-::-webkit-scrollbar{width:6px;height:6px}
-::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
-::-webkit-scrollbar-track{background:transparent}
-.xterm-viewport{overflow-y:auto!important}
 </style>
 </head>
 <body>
@@ -199,27 +551,33 @@ body.panel-hidden #resize-right-handle{display:none}
 <!-- ── Header ── -->
 <header id="header">
   <button class="hdr-btn" id="hamburger-btn" title="Toggle sidebar" aria-label="Toggle sidebar">&#9776;</button>
-  <span class="brand">i4z-terminal-mcp</span>
-  <span id="server-version" style="font-size:10px;color:var(--muted-2);margin-left:2px"></span>
-  <span id="health-dot" title="Health"></span>
-  <span id="health-text">loading...</span>
-  <button class="hdr-btn" id="split-btn" title="Toggle split view">Split</button>
-  <button class="hdr-btn" id="notify-btn" title="Enable browser notifications">Notify</button>
-  <button class="hdr-btn" id="panel-toggle-btn" title="Toggle management panel">Panel</button>
-  <button class="hdr-btn" id="theme-btn">Theme</button>
+  <span class="brand">i4z · terminal</span>
+  <span id="server-version"></span>
+  <span id="health-pip" title="Server health"></span>
+  <span id="health-text">connecting…</span>
+  <span class="hdr-spacer"></span>
+  <button class="hdr-btn" id="split-btn" title="Split view">Split</button>
+  <button class="hdr-btn" id="notify-btn" title="Browser notifications">Notify</button>
+  <button class="hdr-btn active" id="panel-toggle-btn" title="Toggle right panel">Panel</button>
+  <button class="hdr-btn" id="theme-btn" title="Toggle theme">Theme</button>
 </header>
 
 <div id="app-body">
 
 <!-- ── Sidebar ── -->
 <nav id="sidebar">
-  <h2>Terminals</h2>
+  <div id="sidebar-title">
+    <span class="stitle">Terminals</span>
+    <span id="term-count-badge"></span>
+  </div>
   <div id="new-term-bar">
-    <input id="new-term-name" placeholder="Session name..." maxlength="80">
+    <input id="new-term-name" placeholder="Session name…" maxlength="80" autocomplete="off">
     <button id="new-term-btn" title="Create terminal">+</button>
   </div>
   <div id="term-list"></div>
-  <div id="sidebar-footer"></div>
+  <div id="sidebar-footer">
+    <span id="sidebar-url" title="Click to copy URL"></span>
+  </div>
 </nav>
 
 <div id="resize-sidebar-handle" class="resize-handle" title="Drag to resize"></div>
@@ -227,20 +585,32 @@ body.panel-hidden #resize-right-handle{display:none}
 <!-- ── Center ── -->
 <main id="center">
   <div id="tab-bar">
-    <div id="tab-placeholder">Open a terminal from the sidebar</div>
+    <div id="tab-placeholder">Create or select a terminal</div>
+  </div>
+  <div id="info-bar">
+    <span id="infobar-id"></span>
+    <span class="infobar-sep">·</span>
+    <span id="infobar-status"></span>
+    <span class="infobar-sep">·</span>
+    <span id="infobar-size"></span>
+    <span class="infobar-spacer"></span>
+    <button class="ib-btn danger" id="ib-kill-btn" title="Kill terminal process (keeps history)">Kill</button>
+    <button class="ib-btn" id="ib-search-btn" title="Search output">Search</button>
+    <button class="ib-btn" id="ib-clear-btn" title="Clear screen">Clear</button>
   </div>
   <div id="terminals-wrap">
     <div id="empty-state">
-      <h3>No terminal selected</h3>
-      <p>Create or select a terminal from the sidebar.</p>
+      <div class="es-icon">⬡</div>
+      <h3>No terminal open</h3>
+      <p>Type a name and press <kbd>Enter</kbd> to create a new terminal, or click one in the sidebar.</p>
     </div>
   </div>
   <div id="cmd-bar">
     <span id="cmd-prompt">$</span>
-    <input id="cmd-input" placeholder="Send command (Enter to run)..." autocomplete="off">
-    <button class="ctrl-btn" id="sigint-btn" title="Send Ctrl+C">Ctrl+C</button>
+    <input id="cmd-input" placeholder="Send command… (↑↓ history)" autocomplete="off" spellcheck="false">
+    <button class="ctrl-btn" id="sigint-btn" title="Send Ctrl+C (SIGINT)">^C</button>
     <button class="ctrl-btn" id="sigterm-btn" title="Send SIGTERM">Term</button>
-    <button class="ctrl-btn" id="clear-btn" title="Clear terminal (ctrl+l)">Clear</button>
+    <button class="ctrl-btn" id="clear-btn" title="Clear screen">Clear</button>
   </div>
 </main>
 
@@ -251,100 +621,127 @@ body.panel-hidden #resize-right-handle{display:none}
   <div id="panel-tabs">
     <button class="ptab active" data-panel="profile">Profile</button>
     <button class="ptab" data-panel="workspace">Workspace</button>
-    <button class="ptab" data-panel="alerts">Alerts <span id="alert-count-badge" class="alert-badge" style="display:none"></span></button>
+    <button class="ptab" data-panel="alerts">Alerts<span id="alert-badge" class="badge" style="display:none;margin-left:4px"></span></button>
     <button class="ptab" data-panel="checkpoints">Checkpoints</button>
+    <button class="ptab" data-panel="search">Search</button>
     <button class="ptab" data-panel="snapshots">Snapshots</button>
   </div>
   <div id="panel-body">
 
-    <!-- Profile panel -->
+    <!-- ── Profile ── -->
     <div class="panel-section active" id="section-profile">
       <div class="section-title">Session Profile</div>
       <div class="field-row">
         <input class="p-input" id="prof-key" placeholder="ENV_KEY" style="max-width:110px">
         <input class="p-input" id="prof-val" placeholder="value">
+        <button class="p-btn" id="prof-set-btn" title="Set env var">Set</button>
+        <button class="p-btn" id="prof-unset-btn" title="Unset env var">Unset</button>
       </div>
-      <div class="field-row">
-        <button class="p-btn" id="prof-set-btn">Set env</button>
-        <button class="p-btn" id="prof-unset-btn">Unset env</button>
-      </div>
-      <div class="field-row" style="margin-top:6px">
+      <div class="field-row mt-4">
         <label>Startup commands</label>
       </div>
       <textarea class="p-textarea" id="prof-startup" placeholder="one command per line" rows="3"></textarea>
-      <div class="field-row" style="margin-top:4px">
-        <label><input type="checkbox" id="prof-run-now"> run now</label>
-        <button class="p-btn" id="prof-save-btn">Save startup</button>
+      <div class="field-row mt-4 gap-4">
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer">
+          <input type="checkbox" id="prof-run-now"> run now
+        </label>
+        <button class="p-btn primary" id="prof-save-btn">Save startup</button>
       </div>
-      <div class="p-pre" id="prof-view" style="margin-top:6px">Select a terminal</div>
+      <div class="p-pre mt-8" id="prof-view">Select a terminal to view profile</div>
     </div>
 
-    <!-- Workspace panel -->
+    <!-- ── Workspace ── -->
     <div class="panel-section" id="section-workspace">
       <div class="section-title">Workspaces</div>
       <div class="field-row">
         <input class="p-input" id="ws-id-input" placeholder="workspace id">
-        <button class="p-btn" id="ws-create-btn">Create</button>
+        <button class="p-btn primary" id="ws-create-btn">Create</button>
       </div>
-      <div class="field-row">
-        <select class="p-input" id="ws-select" style="flex:1"></select>
-        <button class="p-btn" id="ws-refresh-btn">↻</button>
+      <div class="field-row mt-4">
+        <select class="p-select" id="ws-select"></select>
+        <button class="p-btn" id="ws-refresh-btn" title="Refresh">↻</button>
       </div>
-      <textarea class="p-textarea" id="ws-env-json" placeholder='env JSON {"KEY":"val"}' rows="2"></textarea>
-      <textarea class="p-textarea" id="ws-startup" placeholder="startup commands" rows="2"></textarea>
-      <div class="field-row" style="margin-top:4px">
-        <button class="p-btn" id="ws-save-btn">Save &amp; Apply</button>
-        <button class="p-btn" id="ws-add-member-btn">Add current</button>
-        <button class="p-btn" id="ws-rm-member-btn">Remove current</button>
+      <div class="field-row mt-4">
+        <label>Env JSON</label>
       </div>
-      <div class="p-pre" id="ws-view">No workspace selected</div>
+      <textarea class="p-textarea" id="ws-env-json" placeholder='{"KEY":"value"}' rows="2"></textarea>
+      <div class="field-row mt-4">
+        <label>Startup commands</label>
+      </div>
+      <textarea class="p-textarea" id="ws-startup" placeholder="one command per line" rows="2"></textarea>
+      <div class="field-row mt-4 gap-4">
+        <button class="p-btn primary" id="ws-save-btn">Save</button>
+        <button class="p-btn" id="ws-apply-btn" title="Apply workspace to all members">Apply all</button>
+        <button class="p-btn" id="ws-add-member-btn" title="Add current terminal to workspace">+current</button>
+        <button class="p-btn danger" id="ws-rm-member-btn" title="Remove current terminal from workspace">-current</button>
+      </div>
+      <div class="p-pre mt-8" id="ws-view">No workspace selected</div>
     </div>
 
-    <!-- Alerts panel -->
+    <!-- ── Alerts ── -->
     <div class="panel-section" id="section-alerts">
       <div class="section-title">Output Alerts</div>
       <div class="field-row">
-        <select class="p-input" id="alert-scope" style="max-width:90px">
+        <select class="p-select" id="alert-scope" style="max-width:90px">
           <option value="session">session</option>
           <option value="global">global</option>
         </select>
-        <input class="p-input" id="alert-pattern" placeholder="pattern">
+        <input class="p-input" id="alert-pattern" placeholder="regex pattern">
       </div>
-      <div class="field-row">
+      <div class="field-row mt-4">
         <input class="p-input" id="alert-label" placeholder="label (optional)">
-        <button class="p-btn" id="alert-add-btn">Add</button>
-        <button class="p-btn" id="alert-refresh-btn">↻</button>
+        <button class="p-btn primary" id="alert-add-btn">Add</button>
+        <button class="p-btn" id="alert-refresh-btn" title="Refresh">↻</button>
       </div>
-      <div class="list-box" id="alert-list"></div>
+      <div class="list-box" id="alert-list">
+        <div class="empty-note">No alerts configured</div>
+      </div>
       <div class="subsection">
         <div class="section-title">Recent Events</div>
-        <div class="list-box" id="alert-events-list"></div>
+        <div class="list-box" id="alert-events-list">
+          <div class="empty-note">No recent events</div>
+        </div>
       </div>
     </div>
 
-    <!-- Checkpoints panel -->
+    <!-- ── Checkpoints ── -->
     <div class="panel-section" id="section-checkpoints">
       <div class="section-title">Checkpoints</div>
       <div class="field-row">
         <input class="p-input" id="cp-label" placeholder="label">
-        <input class="p-input" id="cp-note" placeholder="note">
+        <input class="p-input" id="cp-note" placeholder="note (optional)">
       </div>
-      <div class="field-row">
-        <button class="p-btn" id="cp-add-btn">Add checkpoint</button>
-        <button class="p-btn" id="cp-refresh-btn">↻</button>
+      <div class="field-row mt-4">
+        <button class="p-btn primary" id="cp-add-btn">Add checkpoint</button>
+        <button class="p-btn" id="cp-refresh-btn" title="Refresh">↻</button>
       </div>
-      <div class="list-box" id="cp-list"></div>
+      <div class="list-box mt-8" id="cp-list">
+        <div class="empty-note">No checkpoints</div>
+      </div>
     </div>
 
-    <!-- Snapshots panel -->
-    <div class="panel-section" id="section-snapshots">
-      <div class="section-title">Snapshots</div>
+    <!-- ── Search ── -->
+    <div class="panel-section" id="section-search">
+      <div class="section-title">Search Output</div>
       <div class="field-row">
-        <button class="p-btn" id="snap-export-btn">Export selected</button>
+        <input class="p-input" id="search-query" placeholder="search text (case-insensitive)" autocomplete="off">
+        <button class="p-btn primary" id="search-btn">Search</button>
+      </div>
+      <div style="font-size:10px;color:var(--fg-3);margin-bottom:8px">
+        Searches history for the active terminal
+      </div>
+      <div id="search-results"></div>
+    </div>
+
+    <!-- ── Snapshots ── -->
+    <div class="panel-section" id="section-snapshots">
+      <div class="section-title">Session Snapshots</div>
+      <div class="field-row">
+        <button class="p-btn primary" id="snap-export-btn">Export selected</button>
         <button class="p-btn" id="snap-import-btn">Import JSON</button>
       </div>
-      <textarea class="p-textarea" id="snap-json" placeholder="Exported JSON (or paste to import)" rows="6"></textarea>
-      <div class="p-pre" id="snap-status">No snapshot loaded</div>
+      <textarea class="p-textarea mt-8" id="snap-json" placeholder="Exported JSON appears here. Paste JSON and click Import to restore a session." rows="6"></textarea>
+      <div class="p-pre mt-8" id="snap-status">No snapshot loaded</div>
     </div>
 
   </div>
@@ -352,138 +749,147 @@ body.panel-hidden #resize-right-handle{display:none}
 
 </div><!-- #app-body -->
 <div id="overlay"></div>
+<div id="toast-rack"></div>
 
 <script>
-// ════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
 //  Utilities
-// ════════════════════════════════════════════════════════
-const $=id=>document.getElementById(id);
-function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
-async function api(url,opts={}){
-  const r=await fetch(url,opts);
-  const d=await r.json();
-  if(!r.ok)throw new Error(d.error||'request failed');
+// ════════════════════════════════════════════════════════════
+const $ = id => document.getElementById(id);
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
+
+function toast(msg, type = 'info', duration = 4500) {
+  const levels = { info: 'info', success: 'log', error: 'error', warn: 'warn' };
+  console[levels[type] || 'log'](`[i4z:${type}] ${msg}`);
+  const rack = $('toast-rack');
+  const el = document.createElement('div');
+  el.className = `toast toast-${type}`;
+  const icons = { info:'ℹ', success:'✓', error:'✕', warn:'⚠' };
+  el.innerHTML = `<span class="toast-icon">${icons[type]||'ℹ'}</span><span class="toast-msg">${esc(msg)}</span>`;
+  rack.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('visible'));
+  const timer = setTimeout(() => _dismissToast(el), duration);
+  el.onclick = () => { clearTimeout(timer); _dismissToast(el); };
+}
+function _dismissToast(el) {
+  el.classList.remove('visible'); el.classList.add('hiding');
+  setTimeout(() => el.remove(), 280);
+}
+
+async function api(url, opts = {}) {
+  let r;
+  try { r = await fetch(url, opts); }
+  catch (e) {
+    const msg = `Network error — ${e.message}`;
+    console.error(`[api] ${opts.method||'GET'} ${url}`, e);
+    throw new Error(msg);
+  }
+  let d = {};
+  try { d = await r.json(); } catch {}
+  if (!r.ok) {
+    const msg = d.error || `HTTP ${r.status} ${r.statusText}`;
+    console.error(`[api] ${opts.method||'GET'} ${url} → ${r.status}`, d);
+    throw new Error(msg);
+  }
   return d;
 }
-function notify(title,body){
-  if(Notification.permission==='granted'){
-    new Notification(title,{body,icon:''});
-  }
+
+function jpost(url, body) {
+  return api(url, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) });
+}
+function jdel(url) {
+  return api(url, { method:'DELETE' });
 }
 
-// ════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
 //  App state
-// ════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
 let theme = localStorage.getItem('i4z-theme') ||
-  ((window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark');
+  (window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
 
-// Map of terminal_id -> TerminalState
-const terms = new Map();
-
-// Currently visible tab ids
-let primaryTab = null;   // main active tab
-let splitTab   = null;   // split-view second tab
+const terms = new Map();       // id → TerminalState
+let primaryTab = null;
+let splitTab   = null;
 let splitMode  = false;
-
-// Right panel
 let panelVisible = true;
 let activePanel  = 'profile';
+let lastAlertEventId = 0;
 
-// Command history per terminal_id in sessionStorage
-function getCmdHistory(id){try{return JSON.parse(sessionStorage.getItem('hist:'+id)||'[]')}catch{return[]}}
-function pushCmdHistory(id,cmd){
-  const h=getCmdHistory(id);
-  if(h[h.length-1]===cmd)return;
-  h.push(cmd);
-  if(h.length>200)h.shift();
-  sessionStorage.setItem('hist:'+id,JSON.stringify(h));
+function getCmdHistory(id){ try{return JSON.parse(sessionStorage.getItem('h:'+id)||'[]')}catch{return[]} }
+function pushCmdHistory(id, cmd){
+  const h = getCmdHistory(id);
+  if (h[h.length-1] === cmd) return;
+  h.push(cmd); if(h.length>200)h.shift();
+  sessionStorage.setItem('h:'+id, JSON.stringify(h));
 }
 let cmdHistIdx = -1;
 
-// Alert event tracking
-let lastAlertEventId = 0;
-
-// ════════════════════════════════════════════════════════
-//  Terminal state object
-// ════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
+//  TerminalState
+// ════════════════════════════════════════════════════════════
 class TerminalState {
   constructor(id){
-    this.id      = id;
-    this.xterm   = null;
-    this.fit     = null;
-    this.ws      = null;
-    this.alive   = false;
-    this.pane    = null;   // .term-pane DOM element
-    this.xtEl    = null;   // .xterm-container DOM element
-    this.cursor  = 0;
-    this.reconnect = true;
+    this.id = id; this.xterm = null; this.fit = null;
+    this.ws = null; this.alive = false;
+    this.pane = null; this.xtEl = null;
+    this.cursor = 0; this.reconnect = true;
   }
 }
 
-// ════════════════════════════════════════════════════════
-//  xterm.js helpers
-// ════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
+//  xterm.js
+// ════════════════════════════════════════════════════════════
 function xtermTheme(){
   if(theme==='dark') return {
-    background:'#0d1117',foreground:'#c9d1d9',cursor:'#58a6ff',
-    black:'#484f58',red:'#ff7b72',green:'#3fb950',yellow:'#d29922',
-    blue:'#58a6ff',magenta:'#bc8cff',cyan:'#39c5cf',white:'#b1bac4',
-    brightBlack:'#6e7681',brightRed:'#ffa198',brightGreen:'#56d364',
-    brightYellow:'#e3b341',brightBlue:'#79c0ff',brightMagenta:'#d2a8ff',
-    brightCyan:'#56d4dd',brightWhite:'#f0f6fc'
+    background:'#0f0e0c', foreground:'#ede8e0', cursor:'#c4a0f0',
+    black:'#302c28',  red:'#e86868',  green:'#78c490', yellow:'#d4983a',
+    blue:'#88a8e8',   magenta:'#c4a0f0', cyan:'#78c8d0', white:'#c8c0b8',
+    brightBlack:'#504840', brightRed:'#f09090',  brightGreen:'#90d8a8',
+    brightYellow:'#e8b060', brightBlue:'#a8c0f0', brightMagenta:'#d8b8f8',
+    brightCyan:'#90d8e0',  brightWhite:'#f0ece4'
   };
   return {
-    background:'#f6f8fa',foreground:'#24292f',cursor:'#0969da',
-    black:'#24292f',red:'#cf222e',green:'#1a7f37',yellow:'#9a6700',
-    blue:'#0969da',magenta:'#8250df',cyan:'#0550ae',white:'#6e7781',
-    brightBlack:'#57606a',brightRed:'#a40e26',brightGreen:'#116329',
-    brightYellow:'#7d4e00',brightBlue:'#0550ae',brightMagenta:'#6639ba',
-    brightCyan:'#0969da',brightWhite:'#8c959f'
+    background:'#f7f4f0', foreground:'#26201a', cursor:'#7c40c8',
+    black:'#26201a',  red:'#c83030',  green:'#2a8a58', yellow:'#946018',
+    blue:'#2858a8',   magenta:'#7c40c8', cyan:'#1878a0', white:'#6c6058',
+    brightBlack:'#504840', brightRed:'#e05050',  brightGreen:'#40a870',
+    brightYellow:'#b07830', brightBlue:'#4070c0', brightMagenta:'#9060e0',
+    brightCyan:'#3090c0',  brightWhite:'#908880'
   };
 }
 
 function buildXterm(state){
-  const FitAddonClass = (window.FitAddon && window.FitAddon.FitAddon) ? window.FitAddon.FitAddon : window.FitAddon;
+  const FitClass = window.FitAddon?.FitAddon ?? window.FitAddon;
   const term = new Terminal({
-    cursorBlink: true,
-    fontSize: 13,
-    fontFamily: '"Cascadia Code","Fira Code","JetBrains Mono",monospace',
-    theme: xtermTheme(),
-    scrollback: 5000,
-    convertEol: false,
-    allowProposedApi: true,
+    cursorBlink: true, fontSize: 13,
+    fontFamily: "'Cascadia Code','JetBrains Mono','Fira Code','SF Mono',monospace",
+    theme: xtermTheme(), scrollback: 8000,
+    convertEol: false, allowProposedApi: true,
   });
   let fit = null;
-  if(FitAddonClass){
-    fit = new FitAddonClass();
-    term.loadAddon(fit);
-  }
-  state.xterm = term;
-  state.fit   = fit;
+  if(FitClass){ fit = new FitClass(); term.loadAddon(fit); }
+  state.xterm = term; state.fit = fit;
   term.open(state.xtEl);
   if(fit) fit.fit();
-
-  // Keyboard → PTY raw
   term.onData(data => {
-    if(state.ws && state.ws.readyState === 1){
-      state.ws.send(JSON.stringify({type:'input',text:data}));
-    }
+    if(state.ws?.readyState === 1)
+      state.ws.send(JSON.stringify({type:'input', text:data}));
   });
-  // Resize → PTY
   term.onResize(({rows,cols}) => {
-    if(state.ws && state.ws.readyState === 1){
-      state.ws.send(JSON.stringify({type:'resize',rows,cols}));
-    }
+    if(state.ws?.readyState === 1)
+      state.ws.send(JSON.stringify({type:'resize', rows, cols}));
+    if(state.id === primaryTab) updateInfoBar();
   });
-  // Observe container resize
-  const ro = new ResizeObserver(() => { if(fit && state.pane.classList.contains('visible')) fit.fit(); });
+  const ro = new ResizeObserver(() => {
+    if(fit && state.pane.classList.contains('visible')) fit.fit();
+  });
   ro.observe(state.xtEl);
   return term;
 }
 
-// ════════════════════════════════════════════════════════
-//  WebSocket connection per terminal
-// ════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
+//  WebSocket
+// ════════════════════════════════════════════════════════════
 function connectWS(state){
   if(state.ws){ try{state.ws.close()}catch{} }
   state.reconnect = true;
@@ -491,17 +897,12 @@ function connectWS(state){
   const ws = new WebSocket(`${proto}//${location.host}/ws/${encodeURIComponent(state.id)}?since=0`);
   state.ws = ws;
   ws.onmessage = ev => {
-    let msg;
-    try{ msg=JSON.parse(ev.data) }catch{ return }
+    let msg; try{msg=JSON.parse(ev.data)}catch{return}
     if(msg.type==='history'){
-      const events = msg.events||[];
       if(state.xterm){
-        for(const e of events){
+        for(const e of (msg.events||[])){
           if(e.type==='output') state.xterm.write(e.text);
-          else if(e.type==='input'){
-            // show user input hint in muted colour
-            state.xterm.write('\x1b[2m'+e.text+'\x1b[0m');
-          }
+          else if(e.type==='input') state.xterm.write('\x1b[2m'+e.text+'\x1b[0m');
         }
         if(state.fit) state.fit.fit();
       }
@@ -510,265 +911,236 @@ function connectWS(state){
       if(state.xterm) state.xterm.write(msg.text||'');
       state.cursor = msg.cursor||state.cursor;
     } else if(msg.type==='status'){
-      const s=msg.status||{};
+      const s = msg.status||{};
       state.alive = !!s.alive;
       updateTabDot(state.id, state.alive);
       updateSidebarDot(state.id, state.alive);
-      if(primaryTab===state.id) updateCmdBar();
-      if(!state.alive) state.reconnect=false;
+      if(primaryTab===state.id){ updateCmdBar(); updateInfoBar(); }
+      if(!state.alive) state.reconnect = false;
     }
   };
   ws.onclose = () => {
-    if(state.reconnect && state.alive){
-      setTimeout(()=>connectWS(state), 1500);
-    } else if(!state.reconnect){
-      updateTabDot(state.id, false);
-      updateSidebarDot(state.id, false);
-    }
+    if(state.reconnect && state.alive) setTimeout(()=>connectWS(state), 1500);
+    else { updateTabDot(state.id, false); updateSidebarDot(state.id, false); }
   };
-  ws.onerror = () => {};
+  ws.onerror = e => console.warn(`[ws] ${state.id} error`, e);
 }
 
-// ════════════════════════════════════════════════════════
-//  Tab management
-// ════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
+//  Tab & pane management
+// ════════════════════════════════════════════════════════════
 function openTab(id){
-  // On mobile, close sidebar drawer when a terminal is selected
   if(isMobile()) closeDrawers();
   if(primaryTab===id) return;
   if(terms.has(id)){
-    primaryTab = id;
-    renderTabs();
-    showPanes();
-    updateCmdBar();
-    cmdHistIdx = -1;
-    loadProfile();
-    loadAlerts();
-    loadCheckpoints();
-    loadWorkspaces();
-    return;
+    primaryTab=id; renderTabs(); showPanes(); updateCmdBar(); updateInfoBar();
+    cmdHistIdx=-1; _refreshPanels(); return;
   }
-  // Create new pane and state
   const state = new TerminalState(id);
   terms.set(id, state);
-
   const pane = document.createElement('div');
-  pane.className = 'term-pane';
-  pane.dataset.id = id;
+  pane.className='term-pane'; pane.dataset.id=id;
   const xtEl = document.createElement('div');
-  xtEl.className = 'xterm-container';
+  xtEl.className='xterm-container';
   pane.appendChild(xtEl);
   $('terminals-wrap').appendChild(pane);
-  state.pane = pane;
-  state.xtEl = xtEl;
-
-  buildXterm(state);
-  connectWS(state);
-  primaryTab = id;
-  renderTabs();
-  showPanes();
-  updateCmdBar();
-  cmdHistIdx = -1;
-  loadProfile();
-  loadAlerts();
-  loadCheckpoints();
-  loadWorkspaces();
+  state.pane=pane; state.xtEl=xtEl;
+  buildXterm(state); connectWS(state);
+  primaryTab=id; renderTabs(); showPanes(); updateCmdBar(); updateInfoBar();
+  cmdHistIdx=-1; _refreshPanels();
 }
 
 function closeTab(id){
-  const state = terms.get(id);
+  const state=terms.get(id);
   if(state){
-    state.reconnect = false;
+    state.reconnect=false;
     if(state.ws) try{state.ws.close()}catch{}
     if(state.xterm) state.xterm.dispose();
     if(state.pane) state.pane.remove();
     terms.delete(id);
   }
-  if(primaryTab===id){
-    primaryTab = terms.size ? [...terms.keys()][0] : null;
-  }
+  if(primaryTab===id) primaryTab = terms.size ? [...terms.keys()][0] : null;
   if(splitTab===id) splitTab=null;
-  renderTabs();
-  showPanes();
-  updateCmdBar();
+  renderTabs(); showPanes(); updateCmdBar(); updateInfoBar();
 }
 
 function renderTabs(){
-  const bar = $('tab-bar');
-  const placeholder = $('tab-placeholder');
-  if(terms.size===0){
-    bar.innerHTML = '';
-    bar.appendChild(placeholder);
-    placeholder.style.display='flex';
-    return;
-  }
-  placeholder.style.display='none';
-  bar.innerHTML='';
+  const bar=$('tab-bar'), ph=$('tab-placeholder');
+  if(!terms.size){ bar.innerHTML=''; bar.appendChild(ph); ph.style.display='flex'; return; }
+  ph.style.display='none'; bar.innerHTML='';
   for(const [id,state] of terms){
-    const tab = document.createElement('div');
-    tab.className = 'tab'+(id===primaryTab?' active':'');
-    tab.dataset.id = id;
-    const dot = document.createElement('span');
-    dot.className = 'tab-dot'+(state.alive?'':' off');
-    dot.dataset.dot = id;
-    const label = document.createElement('span');
-    label.textContent = id;
-    const close = document.createElement('button');
-    close.className='tab-close';
-    close.title='Close tab (does not kill terminal)';
-    close.textContent='×';
+    const tab=document.createElement('div');
+    tab.className='tab'+(id===primaryTab?' active':''); tab.dataset.id=id;
+    const dot=document.createElement('span');
+    dot.className='tab-dot'+(state.alive?'':' off'); dot.dataset.dot=id;
+    const label=document.createElement('span'); label.textContent=id;
+    const close=document.createElement('button');
+    close.className='tab-close'; close.title='Close tab'; close.textContent='×';
     close.onclick=e=>{e.stopPropagation();closeTab(id)};
-    tab.appendChild(dot);
-    tab.appendChild(label);
-    tab.appendChild(close);
+    tab.append(dot,label,close);
     tab.onclick=()=>openTab(id);
     bar.appendChild(tab);
   }
 }
 
 function showPanes(){
-  // Hide all panes first
-  for(const state of terms.values()){
-    state.pane.classList.remove('visible','split');
-  }
-  $('empty-state').style.display='none';
-
-  if(!primaryTab){
-    $('empty-state').style.display='flex';
-    return;
-  }
-
-  const primary = terms.get(primaryTab);
-  if(!primary){ $('empty-state').style.display='flex'; return; }
-
+  for(const state of terms.values()) state.pane.classList.remove('visible','split');
+  const empty=$('empty-state'); empty.style.display='none';
+  if(!primaryTab){ empty.style.display='flex'; return; }
+  const primary=terms.get(primaryTab);
+  if(!primary){ empty.style.display='flex'; return; }
   if(splitMode && splitTab && terms.has(splitTab) && splitTab!==primaryTab){
     primary.pane.classList.add('visible','split');
-    const sec = terms.get(splitTab);
+    const sec=terms.get(splitTab);
     sec.pane.classList.add('visible','split');
-    if(primary.fit) primary.fit.fit();
-    if(sec.fit) sec.fit.fit();
+    primary.fit?.fit(); sec.fit?.fit();
   } else {
     primary.pane.classList.add('visible');
-    if(primary.fit) primary.fit.fit();
+    primary.fit?.fit();
   }
 }
 
 function updateTabDot(id, alive){
-  const dot = document.querySelector(`.tab-dot[data-dot="${CSS.escape(id)}"]`);
-  if(dot){ dot.className='tab-dot'+(alive?'':' off') }
+  const d=document.querySelector(`.tab-dot[data-dot="${CSS.escape(id)}"]`);
+  if(d) d.className='tab-dot'+(alive?'':' off');
 }
-
 function updateSidebarDot(id, alive){
-  const el = document.querySelector(`.sdot[data-dot="${CSS.escape(id)}"]`);
-  if(el){ el.className='sdot '+(alive?'on':'off') }
+  const el=document.querySelector(`.sdot[data-dot="${CSS.escape(id)}"]`);
+  if(el) el.className='sdot '+(alive?'on':'off');
 }
-
 function updateCmdBar(){
-  const bar = $('cmd-bar');
+  const bar=$('cmd-bar');
   if(primaryTab && terms.has(primaryTab)){
     bar.className='visible';
-    const state = terms.get(primaryTab);
-    $('cmd-input').disabled = !state.alive;
-  } else {
-    bar.className='';
-  }
+    $('cmd-input').disabled = !terms.get(primaryTab).alive;
+  } else { bar.className=''; }
+}
+function updateInfoBar(){
+  const bar=$('info-bar');
+  if(!primaryTab || !terms.has(primaryTab)){ bar.classList.remove('visible'); return; }
+  bar.classList.add('visible');
+  const state=terms.get(primaryTab);
+  $('infobar-id').textContent=state.id;
+  $('infobar-status').innerHTML=state.alive
+    ?'<span style="color:var(--success)">● alive</span>'
+    :'<span style="color:var(--danger)">● dead</span>';
+  const cols=state.xterm?.cols||'?', rows=state.xterm?.rows||'?';
+  $('infobar-size').textContent=`${cols}×${rows}`;
+  $('ib-kill-btn').style.display=state.alive?'':'none';
 }
 
-// ════════════════════════════════════════════════════════
-//  Sidebar – terminal list
-// ════════════════════════════════════════════════════════
-let allTerminals = [];
+// ════════════════════════════════════════════════════════════
+//  Sidebar
+// ════════════════════════════════════════════════════════════
+let allTerminals=[];
 
 async function refreshSidebar(){
   try{
     const data = await api('/api/terminals');
     allTerminals = data;
-    $('sidebar-footer').textContent = data.length ? data.length+' terminal(s)' : '';
-    // Update alive state for open tabs
+    const badge=$('term-count-badge');
+    badge.textContent = data.length ? data.length : '';
+    badge.style.display = data.length ? '' : 'none';
     for(const t of data){
-      const state = terms.get(t.id);
-      if(state && state.alive !== t.alive){
-        // state is updated via WS, just sync dot
-        updateSidebarDot(t.id, state.alive);
-      }
+      const state=terms.get(t.id);
+      if(state) updateSidebarDot(t.id, state.alive);
     }
     renderSidebar(data);
-  }catch{}
+  } catch(e){ console.error('[sidebar] refresh failed:', e.message); }
 }
 
 function renderSidebar(data){
-  const list = $('term-list');
+  const list=$('term-list');
   if(!data.length){
-    list.innerHTML='<div style="color:var(--muted-2);padding:12px;font-size:12px">No terminals</div>';
+    list.innerHTML='<div style="color:var(--fg-3);padding:16px 12px;font-size:12px;text-align:center">No terminals yet</div>';
     return;
   }
   list.innerHTML='';
   for(const t of data){
-    const item = document.createElement('div');
-    const state = terms.get(t.id);
-    const alive = state ? state.alive : t.alive;
-    const isActive = primaryTab===t.id;
-    const inTab = terms.has(t.id);
+    const state=terms.get(t.id);
+    const alive=state?state.alive:t.alive;
+    const isActive=primaryTab===t.id, inTab=terms.has(t.id);
+    const item=document.createElement('div');
     item.className='term-item'+(isActive?' active':inTab?' in-tab':'');
     item.dataset.id=t.id;
-    const dot = document.createElement('span');
-    dot.className='sdot '+(alive?'on':'off');
+
+    const dot=document.createElement('span');
+    dot.className='sdot '+(alive==null?'unknown':alive?'on':'off');
     dot.dataset.dot=t.id;
-    const info = document.createElement('div');
-    info.className='term-info';
-    const label = document.createElement('div');
-    label.className='term-label';
-    label.textContent=t.id;
+    dot.title=alive?'Running':'Stopped';
+
+    const info=document.createElement('div'); info.className='term-info';
+    const label=document.createElement('div'); label.className='term-label'; label.textContent=t.id;
     info.appendChild(label);
-    const del = document.createElement('button');
-    del.className='term-del';
-    del.title='Delete terminal and all history';
-    del.textContent='×';
-    del.onclick=e=>{e.stopPropagation();deleteTerminal(t.id)};
-    item.appendChild(dot);
-    item.appendChild(info);
-    item.appendChild(del);
+
+    const actions=document.createElement('div'); actions.className='term-actions';
+
+    const killBtn=document.createElement('button');
+    killBtn.className='ta-btn warn'; killBtn.title='Kill process (keeps history)'; killBtn.textContent='⏹';
+    killBtn.onclick=e=>{e.stopPropagation();killTerminal(t.id)};
+
+    const delBtn=document.createElement('button');
+    delBtn.className='ta-btn danger'; delBtn.title='Delete terminal and all history'; delBtn.textContent='×';
+    delBtn.onclick=e=>{e.stopPropagation();confirmDeleteTerminal(t.id,item)};
+
+    actions.append(killBtn,delBtn);
+    item.append(dot,info,actions);
     item.onclick=()=>openTab(t.id);
     item.ondblclick=e=>{e.stopPropagation();startRename(item,t.id)};
     list.appendChild(item);
   }
 }
 
-async function deleteTerminal(id){
-  if(!confirm(`Delete terminal "${id}" and all its history? This cannot be undone.`)) return;
+async function killTerminal(id){
   try{
-    await api('/api/terminals/'+encodeURIComponent(id),{method:'DELETE'});
-    if(terms.has(id)) closeTab(id);
+    await jpost(`/api/kill/${encodeURIComponent(id)}`, {});
+    toast(`Killed "${id}"`, 'success');
     await refreshSidebar();
-  }catch(e){ alert(e.message||'delete failed') }
+  } catch(e){ toast(e.message||'Kill failed', 'error'); }
+}
+
+function confirmDeleteTerminal(id, item){
+  const prev=item.innerHTML;
+  const origClick=item.onclick; item.onclick=null;
+  item.innerHTML=`
+    <span style="flex:1;font-size:11px;color:var(--fg-2)">Delete <b>${esc(id)}</b>?</span>
+    <button class="ta-btn danger" id="_cd-yes">Yes</button>
+    <button class="ta-btn" id="_cd-no">No</button>`;
+  item.querySelector('#_cd-yes').onclick=e=>{e.stopPropagation();deleteTerminal(id)};
+  item.querySelector('#_cd-no').onclick=e=>{e.stopPropagation();item.innerHTML=prev;item.onclick=origClick};
+}
+
+async function deleteTerminal(id){
+  try{
+    await jdel(`/api/terminals/${encodeURIComponent(id)}`);
+    if(terms.has(id)) closeTab(id);
+    toast(`Deleted "${id}"`, 'success');
+    await refreshSidebar();
+  } catch(e){ toast(e.message||'Delete failed', 'error'); }
 }
 
 function startRename(item, id){
-  const info = item.querySelector('.term-info');
-  const old = info.querySelector('.term-label');
-  const inp = document.createElement('input');
-  inp.className='rename-input';
-  inp.value=id;
+  const info=item.querySelector('.term-info');
+  const old=info.querySelector('.term-label');
+  const inp=document.createElement('input');
+  inp.className='rename-input'; inp.value=id;
   info.replaceChild(inp,old);
-  inp.focus();
-  inp.select();
+  inp.focus(); inp.select();
   item.onclick=null;
   async function commit(){
-    const newId = inp.value.trim();
+    const newId=inp.value.trim();
     if(newId && newId!==id){
       try{
-        await api('/api/rename/'+encodeURIComponent(id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({new_id:newId})});
-        // Update local state
+        await jpost(`/api/rename/${encodeURIComponent(id)}`,{new_id:newId});
         if(terms.has(id)){
-          const state = terms.get(id);
-          state.id=newId;
-          terms.delete(id);
-          terms.set(newId,state);
+          const state=terms.get(id); state.id=newId;
+          terms.delete(id); terms.set(newId,state);
           if(primaryTab===id) primaryTab=newId;
           if(splitTab===id) splitTab=newId;
-          renderTabs();
+          renderTabs(); updateInfoBar();
         }
-      }catch(e){ alert(e.message||'rename failed') }
+        toast(`Renamed to "${newId}"`, 'success');
+      } catch(e){ toast(e.message||'Rename failed','error'); }
     }
     refreshSidebar();
   }
@@ -779,36 +1151,31 @@ function startRename(item, id){
   };
 }
 
-// ════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
 //  Create terminal
-// ════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
 async function createTerminal(){
-  const inp=$('new-term-name');
-  const name=inp.value.trim();
-  if(!name)return;
+  const inp=$('new-term-name'), name=inp.value.trim();
+  if(!name){ toast('Enter a session name','warn'); return; }
   try{
-    const d=await api('/api/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,interactive:true})});
-    inp.value='';
-    await refreshSidebar();
-    openTab(d.terminal_id);
-  }catch(e){ alert(e.message||'create failed') }
+    const d=await jpost('/api/create',{name,interactive:true});
+    inp.value=''; await refreshSidebar(); openTab(d.terminal_id);
+    toast(`Created "${d.terminal_id}"`, 'success');
+  } catch(e){ toast(e.message||'Create failed','error'); }
 }
 
-// ════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
 //  Command bar
-// ════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
 async function sendCommand(){
-  const inp=$('cmd-input');
-  const text=inp.value;
+  const inp=$('cmd-input'), text=inp.value;
   if(!text||!primaryTab)return;
   const state=terms.get(primaryTab);
-  if(!state||!state.alive)return;
-  inp.value='';
-  cmdHistIdx=-1;
-  pushCmdHistory(primaryTab,text);
+  if(!state?.alive)return;
+  inp.value=''; cmdHistIdx=-1; pushCmdHistory(primaryTab,text);
   try{
-    await api('/api/send/'+encodeURIComponent(primaryTab),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text+'\n'})});
-  }catch{}
+    await jpost(`/api/send/${encodeURIComponent(primaryTab)}`,{text:text+'\n'});
+  } catch(e){ toast(e.message||'Send failed','error'); }
 }
 
 $('cmd-input').onkeydown=function(e){
@@ -819,418 +1186,494 @@ $('cmd-input').onkeydown=function(e){
     if(cmdHistIdx===-1) cmdHistIdx=h.length-1;
     else if(cmdHistIdx>0) cmdHistIdx--;
     if(h[cmdHistIdx]!==undefined) this.value=h[cmdHistIdx];
-    return;
-  }
-  if(e.key==='ArrowDown'){
+  } else if(e.key==='ArrowDown'){
     e.preventDefault();
-    if(cmdHistIdx<h.length-1){ cmdHistIdx++; this.value=h[cmdHistIdx]||'' }
-    else{ cmdHistIdx=-1; this.value='' }
-    return;
-  }
-  cmdHistIdx=-1;
+    if(cmdHistIdx<h.length-1){cmdHistIdx++;this.value=h[cmdHistIdx]||''}
+    else{cmdHistIdx=-1;this.value=''}
+  } else { cmdHistIdx=-1; }
 };
 
-// Ctrl+C / SIGTERM / Clear
 $('sigint-btn').onclick=async()=>{
   if(!primaryTab)return;
-  try{ await api('/api/signal/'+encodeURIComponent(primaryTab),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({signal:'SIGINT'})}) }catch{}
+  try{ await jpost(`/api/signal/${encodeURIComponent(primaryTab)}`,{signal:'SIGINT'}) }
+  catch(e){ toast(e.message,'error'); }
 };
 $('sigterm-btn').onclick=async()=>{
   if(!primaryTab)return;
-  try{ await api('/api/signal/'+encodeURIComponent(primaryTab),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({signal:'SIGTERM'})}) }catch{}
+  try{ await jpost(`/api/signal/${encodeURIComponent(primaryTab)}`,{signal:'SIGTERM'}) }
+  catch(e){ toast(e.message,'error'); }
 };
 $('clear-btn').onclick=()=>{
   const state=terms.get(primaryTab||'');
-  if(state && state.xterm) state.xterm.clear();
-  if(primaryTab){
-    const s=terms.get(primaryTab);
-    if(s&&s.ws&&s.ws.readyState===1) s.ws.send(JSON.stringify({type:'input',text:'\x0c'}));
-  }
+  if(state?.xterm) state.xterm.clear();
 };
 
-// ════════════════════════════════════════════════════════
-//  Drawer helpers (mobile/tablet)
-// ════════════════════════════════════════════════════════
-function isMobile(){ return window.innerWidth < 640 }
-function isTablet(){ return window.innerWidth >= 640 && window.innerWidth < 1024 }
-function isSmallScreen(){ return window.innerWidth < 1024 }
-
-function closeDrawers(){
-  $('sidebar').classList.remove('drawer-open');
-  $('right-panel').classList.remove('drawer-open');
-  $('overlay').classList.remove('visible');
-}
-
-function openSidebarDrawer(){
-  $('sidebar').classList.add('drawer-open');
-  $('right-panel').classList.remove('drawer-open');
-  $('overlay').classList.add('visible');
-}
-
-function openRightDrawer(){
-  $('right-panel').classList.add('drawer-open');
-  $('sidebar').classList.remove('drawer-open');
-  $('overlay').classList.add('visible');
-  // ensure panel is not hidden by desktop class
-  $('right-panel').style.display='flex';
-}
-
-$('overlay').onclick = closeDrawers;
-
-// ════════════════════════════════════════════════════════
-//  Header controls
-// ════════════════════════════════════════════════════════
-$('new-term-btn').onclick=createTerminal;
-$('new-term-name').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();createTerminal()}};
-
-$('hamburger-btn').onclick=function(){
-  if($('sidebar').classList.contains('drawer-open')) closeDrawers();
-  else openSidebarDrawer();
+// Info bar buttons
+$('ib-kill-btn').onclick=()=>{ if(primaryTab) killTerminal(primaryTab); };
+$('ib-clear-btn').onclick=()=>{ const s=terms.get(primaryTab||''); if(s?.xterm) s.xterm.clear(); };
+$('ib-search-btn').onclick=()=>{
+  // Switch to search panel and focus
+  switchPanel('search');
+  if(!isSmallScreen()) { /* inline panel already visible */ }
+  else openRightDrawer();
+  setTimeout(()=>$('search-query').focus(),100);
 };
 
-$('split-btn').onclick=function(){
-  splitMode=!splitMode;
-  this.classList.toggle('active',splitMode);
-  if(splitMode){
-    const ids=[...terms.keys()];
-    const other=ids.find(id=>id!==primaryTab);
-    if(other) splitTab=other;
-    else{ splitMode=false; this.classList.remove('active'); alert('Open another terminal tab first'); return }
-  }
-  showPanes();
-};
-
-$('notify-btn').onclick=async function(){
-  if(Notification.permission==='granted'){ this.textContent='Notify ✓'; return }
-  const p=await Notification.requestPermission();
-  if(p==='granted'){ this.textContent='Notify ✓'; this.classList.add('active') }
-};
-
-$('panel-toggle-btn').onclick=function(){
-  if(isSmallScreen()){
-    // Mobile/tablet: slide drawer from edge
-    if($('right-panel').classList.contains('drawer-open')) closeDrawers();
-    else openRightDrawer();
-  } else {
-    // Desktop: inline show/hide
-    panelVisible=!panelVisible;
-    document.body.classList.toggle('panel-hidden',!panelVisible);
-    this.classList.toggle('active',panelVisible);
-    setTimeout(()=>{ for(const s of terms.values()) if(s.fit) s.fit.fit() },60);
-  }
-};
-
-$('theme-btn').onclick=function(){
-  theme=theme==='dark'?'light':'dark';
-  applyTheme();
-};
-
-// ════════════════════════════════════════════════════════
-//  Drag-to-resize panels (desktop only)
-// ════════════════════════════════════════════════════════
-function setupResize(handleId, cssVar, getSide){
-  const handle = $(handleId);
-  if(!handle) return;
-  handle.addEventListener('pointerdown', e=>{
-    if(isSmallScreen()) return;
-    const startX = e.clientX;
-    const sideEl = getSide();
-    const startW = sideEl.getBoundingClientRect().width;
-    handle.classList.add('dragging');
-    document.body.style.cursor='col-resize';
-    document.body.style.userSelect='none';
-    e.preventDefault();
-    function onMove(e){
-      const delta = cssVar==='--sidebar-w' ? e.clientX-startX : startX-e.clientX;
-      const newW = Math.max(160, Math.min(560, startW+delta));
-      document.documentElement.style.setProperty(cssVar, newW+'px');
-      localStorage.setItem('resize-'+cssVar, String(newW));
-      for(const s of terms.values()) if(s.fit) s.fit.fit();
-    }
-    function onUp(){
-      handle.classList.remove('dragging');
-      document.body.style.cursor='';
-      document.body.style.userSelect='';
-      document.removeEventListener('pointermove', onMove);
-      document.removeEventListener('pointerup', onUp);
-    }
-    document.addEventListener('pointermove', onMove);
-    document.addEventListener('pointerup', onUp);
-  });
-}
-setupResize('resize-sidebar-handle','--sidebar-w',()=>$('sidebar'));
-setupResize('resize-right-handle','--right-w',()=>$('right-panel'));
-
-// Restore saved widths (desktop only)
-if(!isSmallScreen()){
-  const sw=localStorage.getItem('resize---sidebar-w');
-  if(sw) document.documentElement.style.setProperty('--sidebar-w',sw+'px');
-  const rw=localStorage.getItem('resize---right-w');
-  if(rw) document.documentElement.style.setProperty('--right-w',rw+'px');
-}
-
-// Re-fit terminals on window resize
-window.addEventListener('resize',()=>{
-  for(const s of terms.values()) if(s.fit && s.pane.classList.contains('visible')) s.fit.fit();
-});
-
-function applyTheme(){
-  document.body.dataset.theme=theme;
-  localStorage.setItem('i4z-theme',theme);
-  $('theme-btn').textContent='Theme: '+theme;
-  for(const s of terms.values()){
-    if(s.xterm) s.xterm.options.theme=xtermTheme();
-  }
-}
-
-// ════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
 //  Right panel tabs
-// ════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
+function switchPanel(name){
+  activePanel=name;
+  document.querySelectorAll('.ptab').forEach(b=>b.classList.toggle('active',b.dataset.panel===name));
+  document.querySelectorAll('.panel-section').forEach(s=>s.classList.remove('active'));
+  $('section-'+name).classList.add('active');
+  if(name==='profile') loadProfile();
+  else if(name==='workspace') loadWorkspaces();
+  else if(name==='alerts'){ loadAlerts(); loadAlertEvents(); }
+  else if(name==='checkpoints') loadCheckpoints();
+  else if(name==='search') { /* triggered on demand */ }
+}
 document.querySelectorAll('.ptab').forEach(btn=>{
-  btn.onclick=()=>{
-    activePanel=btn.dataset.panel;
-    document.querySelectorAll('.ptab').forEach(b=>b.classList.remove('active'));
-    document.querySelectorAll('.panel-section').forEach(s=>s.classList.remove('active'));
-    btn.classList.add('active');
-    $('section-'+activePanel).classList.add('active');
-    // Refresh panel content
-    if(activePanel==='profile') loadProfile();
-    else if(activePanel==='workspace') loadWorkspaces();
-    else if(activePanel==='alerts'){ loadAlerts(); loadAlertEvents(); }
-    else if(activePanel==='checkpoints') loadCheckpoints();
-  };
+  btn.onclick=()=>switchPanel(btn.dataset.panel);
 });
 
-// ════════════════════════════════════════════════════════
+function _refreshPanels(){
+  if(activePanel==='profile') loadProfile();
+  else if(activePanel==='workspace') loadWorkspaces();
+  else if(activePanel==='alerts') loadAlerts();
+  else if(activePanel==='checkpoints') loadCheckpoints();
+}
+
+// ════════════════════════════════════════════════════════════
 //  Profile panel
-// ════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
 async function loadProfile(){
-  if(!primaryTab){ $('prof-view').textContent='Select a terminal'; $('prof-startup').value=''; return }
+  if(!primaryTab){ $('prof-view').textContent='Select a terminal to view profile'; $('prof-startup').value=''; return; }
   try{
-    const d=await api('/api/profile/'+encodeURIComponent(primaryTab));
+    const d=await api(`/api/profile/${encodeURIComponent(primaryTab)}`);
     $('prof-view').textContent=JSON.stringify(d,null,2);
     $('prof-startup').value=(d.startup_commands||[]).join('\n');
-  }catch(e){ $('prof-view').textContent=e.message||'unavailable' }
+  } catch(e){
+    console.error('[profile] load:', e.message);
+    $('prof-view').textContent='Error: '+e.message;
+  }
 }
 $('prof-set-btn').onclick=async()=>{
-  if(!primaryTab) return;
+  if(!primaryTab){ toast('Select a terminal first','warn'); return; }
   const key=$('prof-key').value.trim(), val=$('prof-val').value;
-  if(!key)return;
-  try{ await api('/api/profile/'+encodeURIComponent(primaryTab),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({set_env:{[key]:val}})}); loadProfile() }catch(e){alert(e.message)}
+  if(!key){ toast('Enter an env key','warn'); return; }
+  try{
+    await jpost(`/api/profile/${encodeURIComponent(primaryTab)}`,{set_env:{[key]:val}});
+    toast(`Set ${key}`, 'success'); loadProfile();
+  } catch(e){ toast(e.message||'Failed','error'); }
 };
 $('prof-unset-btn').onclick=async()=>{
-  if(!primaryTab) return;
+  if(!primaryTab){ toast('Select a terminal first','warn'); return; }
   const key=$('prof-key').value.trim();
-  if(!key)return;
-  try{ await api('/api/profile/'+encodeURIComponent(primaryTab),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({unset_env:[key]})}); loadProfile() }catch(e){alert(e.message)}
+  if(!key){ toast('Enter an env key','warn'); return; }
+  try{
+    await jpost(`/api/profile/${encodeURIComponent(primaryTab)}`,{unset_env:[key]});
+    toast(`Unset ${key}`, 'success'); loadProfile();
+  } catch(e){ toast(e.message||'Failed','error'); }
 };
 $('prof-save-btn').onclick=async()=>{
-  if(!primaryTab) return;
+  if(!primaryTab){ toast('Select a terminal first','warn'); return; }
   const startup_commands=$('prof-startup').value.split('\n').map(s=>s.trim()).filter(Boolean);
   const run_startup_commands=$('prof-run-now').checked;
-  try{ await api('/api/profile/'+encodeURIComponent(primaryTab),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({startup_commands,run_startup_commands})}); loadProfile() }catch(e){alert(e.message)}
+  try{
+    await jpost(`/api/profile/${encodeURIComponent(primaryTab)}`,{startup_commands,run_startup_commands});
+    toast('Startup saved', 'success'); loadProfile();
+  } catch(e){ toast(e.message||'Failed','error'); }
 };
 
-// ════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
 //  Workspace panel
-// ════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
 async function loadWorkspaces(){
   try{
     const items=await api('/api/workspaces');
-    const sel=$('ws-select');
-    const cur=sel.value;
-    sel.innerHTML=items.map(w=>`<option value="${esc(w.id)}">${esc(w.id)} (${w.member_count||0})</option>`).join('');
+    const sel=$('ws-select'), cur=sel.value;
+    sel.innerHTML=items.length
+      ? items.map(w=>`<option value="${esc(w.id)}">${esc(w.id)} (${w.member_count||0})</option>`).join('')
+      : '<option value="">— no workspaces —</option>';
     if(cur&&items.find(w=>w.id===cur)) sel.value=cur;
     else if(items.length) sel.value=items[0].id;
     loadWorkspaceDetail();
-  }catch{}
+  } catch(e){ console.error('[workspace] list:', e.message); }
 }
 async function loadWorkspaceDetail(){
   const id=$('ws-select').value;
-  if(!id){ $('ws-view').textContent='No workspace selected'; return }
+  if(!id){ $('ws-view').textContent='No workspace selected'; return; }
   try{
-    const d=await api('/api/workspaces/'+encodeURIComponent(id));
+    const d=await api(`/api/workspaces/${encodeURIComponent(id)}`);
     $('ws-view').textContent=JSON.stringify(d,null,2);
     $('ws-env-json').value=JSON.stringify(d.env||{},null,2);
     $('ws-startup').value=(d.startup_commands||[]).join('\n');
-  }catch(e){ $('ws-view').textContent=e.message }
+  } catch(e){ console.error('[workspace] detail:', e.message); $('ws-view').textContent='Error: '+e.message; }
 }
 $('ws-select').onchange=loadWorkspaceDetail;
 $('ws-refresh-btn').onclick=loadWorkspaces;
 $('ws-create-btn').onclick=async()=>{
   const workspace_id=$('ws-id-input').value.trim();
-  if(!workspace_id)return;
+  if(!workspace_id){ toast('Enter a workspace id','warn'); return; }
   try{
-    let env={};
-    const raw=$('ws-env-json').value.trim();
-    if(raw) env=JSON.parse(raw);
+    let env={}; const raw=$('ws-env-json').value.trim();
+    if(raw) try{env=JSON.parse(raw)}catch{toast('Invalid env JSON','warn');return}
     const startup_commands=$('ws-startup').value.split('\n').map(s=>s.trim()).filter(Boolean);
-    await api('/api/workspaces',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({workspace_id,env,startup_commands})});
+    await jpost('/api/workspaces',{workspace_id,env,startup_commands});
     $('ws-id-input').value='';
+    toast(`Workspace "${workspace_id}" created`, 'success');
     loadWorkspaces();
-  }catch(e){alert(e.message)}
+  } catch(e){ toast(e.message||'Failed','error'); }
 };
 $('ws-save-btn').onclick=async()=>{
   const id=$('ws-select').value;
-  if(!id)return;
+  if(!id){ toast('Select a workspace first','warn'); return; }
   try{
-    let set_env={};
-    const raw=$('ws-env-json').value.trim();
-    if(raw) set_env=JSON.parse(raw);
+    let set_env={}; const raw=$('ws-env-json').value.trim();
+    if(raw) try{set_env=JSON.parse(raw)}catch{toast('Invalid env JSON','warn');return}
     const startup_commands=$('ws-startup').value.split('\n').map(s=>s.trim()).filter(Boolean);
-    await api('/api/workspaces/'+encodeURIComponent(id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({set_env,startup_commands,apply_to_members:true})});
-    loadWorkspaceDetail(); loadProfile();
-  }catch(e){alert(e.message)}
+    await jpost(`/api/workspaces/${encodeURIComponent(id)}`,{set_env,startup_commands,apply_to_members:false});
+    toast('Workspace saved', 'success'); loadWorkspaceDetail(); loadProfile();
+  } catch(e){ toast(e.message||'Failed','error'); }
+};
+$('ws-apply-btn').onclick=async()=>{
+  const id=$('ws-select').value;
+  if(!id){ toast('Select a workspace first','warn'); return; }
+  try{
+    await jpost(`/api/workspaces/${encodeURIComponent(id)}/apply`,{});
+    toast(`Workspace "${id}" applied to all members`, 'success');
+  } catch(e){ toast(e.message||'Failed','error'); }
 };
 $('ws-add-member-btn').onclick=async()=>{
   const id=$('ws-select').value;
-  if(!id||!primaryTab)return;
-  try{ await api('/api/workspaces/'+encodeURIComponent(id)+'/members',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({terminal_id:primaryTab})}); loadWorkspaceDetail() }catch(e){alert(e.message)}
+  if(!id){ toast('Select a workspace first','warn'); return; }
+  if(!primaryTab){ toast('Select a terminal first','warn'); return; }
+  try{
+    await jpost(`/api/workspaces/${encodeURIComponent(id)}/members`,{terminal_id:primaryTab});
+    toast(`Added "${primaryTab}" to workspace`, 'success'); loadWorkspaceDetail();
+  } catch(e){ toast(e.message||'Failed','error'); }
 };
 $('ws-rm-member-btn').onclick=async()=>{
   const id=$('ws-select').value;
-  if(!id||!primaryTab)return;
-  try{ await api('/api/workspaces/'+encodeURIComponent(id)+'/members/'+encodeURIComponent(primaryTab),{method:'DELETE'}); loadWorkspaceDetail() }catch(e){alert(e.message)}
+  if(!id||!primaryTab){ toast('Select workspace and terminal first','warn'); return; }
+  try{
+    await jdel(`/api/workspaces/${encodeURIComponent(id)}/members/${encodeURIComponent(primaryTab)}`);
+    toast(`Removed "${primaryTab}" from workspace`, 'success'); loadWorkspaceDetail();
+  } catch(e){ toast(e.message||'Failed','error'); }
 };
 
-// ════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
 //  Alerts panel
-// ════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
 async function loadAlerts(){
   try{
     const qs=primaryTab?'?terminal_id='+encodeURIComponent(primaryTab):'';
     const items=await api('/api/alerts'+qs);
     const list=$('alert-list');
-    list.innerHTML=items.length
-      ?items.map(a=>`<div class="list-row"><span class="lname">${esc(a.scope)} ${esc(a.pattern)}${a.terminal_id?' @ '+esc(a.terminal_id):''}</span><button data-id="${esc(a.id)}">✕</button></div>`).join('')
-      :'<div class="muted">No alerts</div>';
-    list.querySelectorAll('button[data-id]').forEach(b=>b.onclick=()=>removeAlert(b.dataset.id));
-  }catch{}
+    if(!items.length){ list.innerHTML='<div class="empty-note">No alerts configured</div>'; return; }
+    list.innerHTML=items.map(a=>`
+      <div class="list-row">
+        <span class="lname" title="${esc(a.pattern)}">${esc(a.scope)} · ${esc(a.pattern)}${a.terminal_id?' @ '+esc(a.terminal_id):''}</span>
+        <button class="ldel" data-id="${esc(a.id)}">✕</button>
+      </div>`).join('');
+    list.querySelectorAll('.ldel[data-id]').forEach(b=>b.onclick=()=>removeAlert(b.dataset.id));
+  } catch(e){ console.error('[alerts] load:', e.message); }
 }
 async function loadAlertEvents(){
   try{
     const qs='?since='+lastAlertEventId+(primaryTab?'&terminal_id='+encodeURIComponent(primaryTab):'');
     const items=await api('/api/alert-events'+qs);
-    if(items.length){
-      lastAlertEventId=items[items.length-1].id||lastAlertEventId;
-      const list=$('alert-events-list');
-      for(const e of items){
-        const row=document.createElement('div');
-        row.className='list-row';
-        row.innerHTML=`<span class="lname">${esc(e.terminal_id)}: ${esc(e.pattern)} → ${esc((e.matched_text||'').slice(0,60))}</span>`;
-        list.prepend(row);
-        // Browser notification
-        notify('Alert: '+e.pattern,'Terminal: '+e.terminal_id+'\n'+e.matched_text);
-      }
-      // Badge
-      const badge=$('alert-count-badge');
-      badge.style.display='inline';
-      badge.textContent='+'+items.length;
+    if(!items.length) return;
+    lastAlertEventId=items[items.length-1].id||lastAlertEventId;
+    const list=$('alert-events-list');
+    const emptyNote=list.querySelector('.empty-note');
+    if(emptyNote) emptyNote.remove();
+    for(const e of items){
+      const row=document.createElement('div'); row.className='list-row';
+      row.innerHTML=`<span class="lname">${esc(e.terminal_id)}: <b>${esc(e.pattern)}</b> → ${esc((e.matched_text||'').slice(0,80))}</span>
+        <span class="lmeta">${new Date(e.timestamp||'').toLocaleTimeString()}</span>`;
+      list.prepend(row);
     }
-  }catch{}
+    // Update badge
+    const badge=$('alert-badge');
+    const prev=parseInt(badge.textContent)||0;
+    badge.textContent=String(prev+items.length);
+    badge.style.display='inline';
+    // Browser notification
+    for(const e of items) _browserNotify('Alert: '+e.pattern,'['+e.terminal_id+'] '+e.matched_text);
+  } catch(e){ console.error('[alert-events] load:', e.message); }
 }
 async function removeAlert(id){
-  try{ await api('/api/alerts/'+encodeURIComponent(id),{method:'DELETE'}); loadAlerts() }catch(e){alert(e.message)}
+  try{ await jdel(`/api/alerts/${encodeURIComponent(id)}`); toast('Alert removed','success'); loadAlerts(); }
+  catch(e){ toast(e.message||'Failed','error'); }
 }
 $('alert-add-btn').onclick=async()=>{
-  const scope=$('alert-scope').value;
-  const pattern=$('alert-pattern').value.trim();
+  const scope=$('alert-scope').value, pattern=$('alert-pattern').value.trim();
   const label=$('alert-label').value.trim()||undefined;
-  if(!pattern)return;
+  if(!pattern){ toast('Enter a pattern','warn'); return; }
   try{
-    await api('/api/alerts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({scope,pattern,label,terminal_id:scope==='session'?primaryTab:null})});
+    await jpost('/api/alerts',{scope,pattern,label,terminal_id:scope==='session'?primaryTab:null});
     $('alert-pattern').value=''; $('alert-label').value='';
-    loadAlerts();
-  }catch(e){alert(e.message)}
+    toast('Alert added','success'); loadAlerts();
+  } catch(e){ toast(e.message||'Failed','error'); }
 };
-$('alert-refresh-btn').onclick=()=>{ loadAlerts(); loadAlertEvents() };
+$('alert-refresh-btn').onclick=()=>{ loadAlerts(); loadAlertEvents(); };
 
-// ════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
 //  Checkpoints panel
-// ════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
 async function loadCheckpoints(){
   try{
     const qs=primaryTab?'?terminal_id='+encodeURIComponent(primaryTab):'';
     const items=await api('/api/checkpoints'+qs);
-    $('cp-list').innerHTML=items.length
-      ?items.map(c=>`<div class="list-row"><span class="lname">${esc(c.label)}${c.note?' — '+esc(c.note):''}</span><button data-id="${esc(c.id)}">✕</button></div>`).join('')
-      :'<div class="muted">No checkpoints</div>';
-    $('cp-list').querySelectorAll('button[data-id]').forEach(b=>b.onclick=async()=>{
-      try{ await api('/api/checkpoints/'+encodeURIComponent(b.dataset.id),{method:'DELETE'}); loadCheckpoints() }catch(e){alert(e.message)}
+    const list=$('cp-list');
+    if(!items.length){ list.innerHTML='<div class="empty-note">No checkpoints</div>'; return; }
+    list.innerHTML=items.map(c=>`
+      <div class="list-row">
+        <span class="lname">${esc(c.label)}${c.note?' — <span style="color:var(--fg-3)">'+esc(c.note)+'</span>':''}</span>
+        <span class="lmeta">${new Date(c.timestamp||'').toLocaleDateString()}</span>
+        <button class="ldel" data-id="${esc(c.id)}">✕</button>
+      </div>`).join('');
+    list.querySelectorAll('.ldel[data-id]').forEach(b=>b.onclick=async()=>{
+      try{ await jdel(`/api/checkpoints/${encodeURIComponent(b.dataset.id)}`); toast('Checkpoint removed','success'); loadCheckpoints(); }
+      catch(e){ toast(e.message||'Failed','error'); }
     });
-  }catch{}
+  } catch(e){ console.error('[checkpoints] load:', e.message); }
 }
 $('cp-add-btn').onclick=async()=>{
-  if(!primaryTab){ alert('Select a terminal first'); return }
+  if(!primaryTab){ toast('Select a terminal first','warn'); return; }
   const label=$('cp-label').value.trim(), note=$('cp-note').value.trim()||undefined;
-  if(!label)return;
-  try{ await api('/api/checkpoints',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({terminal_id:primaryTab,label,note})}); $('cp-label').value=''; $('cp-note').value=''; loadCheckpoints() }catch(e){alert(e.message)}
+  if(!label){ toast('Enter a checkpoint label','warn'); return; }
+  try{
+    await jpost('/api/checkpoints',{terminal_id:primaryTab,label,note});
+    $('cp-label').value=''; $('cp-note').value='';
+    toast(`Checkpoint "${label}" added`,'success'); loadCheckpoints();
+  } catch(e){ toast(e.message||'Failed','error'); }
 };
 $('cp-refresh-btn').onclick=loadCheckpoints;
 
-// ════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
+//  Search panel
+// ════════════════════════════════════════════════════════════
+async function runSearch(){
+  const q=$('search-query').value.trim();
+  if(!q){ toast('Enter a search query','warn'); return; }
+  if(!primaryTab){ toast('Select a terminal first','warn'); return; }
+  const container=$('search-results');
+  container.innerHTML='<div class="empty-note">Searching…</div>';
+  try{
+    const d=await api(`/api/search/${encodeURIComponent(primaryTab)}?q=${encodeURIComponent(q)}`);
+    const events=d.events||[];
+    if(!events.length){ container.innerHTML='<div class="empty-note">No results for "'+esc(q)+'"</div>'; return; }
+    const re=new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'gi');
+    container.innerHTML=events.map(e=>`
+      <div class="search-result">
+        <div class="sr-meta">#${e.id} · ${esc(e.type)} · ${new Date(e.timestamp||'').toLocaleTimeString()}</div>
+        <div class="sr-text">${esc(e.text||'').replace(new RegExp(esc(q),'gi'),m=>`<span class="sr-highlight">${m}</span>`)}</div>
+      </div>`).join('');
+    toast(`${events.length} result(s) found`,'info');
+  } catch(e){ container.innerHTML='<div class="empty-note" style="color:var(--danger)">Error: '+esc(e.message)+'</div>'; toast(e.message,'error'); }
+}
+$('search-btn').onclick=runSearch;
+$('search-query').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();runSearch()}};
+
+// ════════════════════════════════════════════════════════════
 //  Snapshots panel
-// ════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
 $('snap-export-btn').onclick=async()=>{
-  if(!primaryTab){ alert('Select a terminal first'); return }
-  try{ const d=await api('/api/export/'+encodeURIComponent(primaryTab)); $('snap-json').value=JSON.stringify(d,null,2); $('snap-status').textContent='Exported '+primaryTab }catch(e){alert(e.message)}
+  if(!primaryTab){ toast('Select a terminal first','warn'); return; }
+  try{
+    const d=await api(`/api/export/${encodeURIComponent(primaryTab)}`);
+    $('snap-json').value=JSON.stringify(d,null,2);
+    $('snap-status').textContent='Exported: '+primaryTab;
+    toast(`Exported "${primaryTab}"`, 'success');
+  } catch(e){ toast(e.message||'Export failed','error'); }
 };
 $('snap-import-btn').onclick=async()=>{
   const raw=$('snap-json').value.trim();
-  if(!raw){ alert('Paste a snapshot JSON first'); return }
-  try{ const snapshot=JSON.parse(raw); const d=await api('/api/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({snapshot})}); $('snap-status').textContent='Imported '+d.terminal_id; refreshSidebar() }catch(e){alert(e.message)}
+  if(!raw){ toast('Paste snapshot JSON first','warn'); return; }
+  try{
+    const snapshot=JSON.parse(raw);
+    const d=await jpost('/api/import',{snapshot});
+    $('snap-status').textContent='Imported: '+d.terminal_id;
+    toast(`Imported "${d.terminal_id}"`, 'success');
+    refreshSidebar();
+  } catch(e){ toast(e.message||'Import failed','error'); }
 };
 
-// ════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
 //  Health
-// ════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
 async function loadHealth(){
+  const pip=$('health-pip'), txt=$('health-text');
   try{
     const d=await api('/api/health');
-    const ok=d.db&&d.db.ok;
-    const counts=d.counts||{};
-    const sessions=d.sessions||{};
+    const ok=d.db?.ok, counts=d.counts||{}, sessions=d.sessions||{};
     const errs=(d.reader_errors||[]).length;
-    const dot=$('health-dot');
-    if(!ok||errs>0){ dot.className='health-dot bad'; }
-    else if((sessions.stale||[]).length>0){ dot.className='health-dot warn'; }
-    else { dot.className='health-dot ok'; }
-    $('health-text').textContent=`db:${ok?'ok':'ERR'} · active:${sessions.active||0} · alerts:${counts.alerts||0} · ws:${counts.workspaces||0}${errs?' · ⚠ '+errs+' err':''}`;
-  }catch{
-    $('health-dot').className='health-dot bad';
-    $('health-text').textContent='health unavailable';
+    pip.className='health-pip'+(ok&&errs===0?((sessions.stale||[]).length?'warn':'ok'):'bad');
+    txt.textContent=`db:${ok?'ok':'ERR'} · active:${sessions.active||0} · alerts:${counts.alerts||0} · ws:${counts.workspaces||0}`+(errs?` · ⚠${errs} err`:'');
+  } catch(e){
+    pip.className='health-pip bad'; txt.textContent='health unavailable';
+    console.warn('[health]', e.message);
   }
 }
 
-// ════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
+//  Browser notifications
+// ════════════════════════════════════════════════════════════
+function _browserNotify(title, body){
+  if(Notification.permission==='granted') new Notification(title,{body});
+}
+
+// ════════════════════════════════════════════════════════════
+//  Header controls
+// ════════════════════════════════════════════════════════════
+$('new-term-btn').onclick=createTerminal;
+$('new-term-name').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();createTerminal()}};
+
+$('hamburger-btn').onclick=function(){
+  $('sidebar').classList.contains('drawer-open') ? closeDrawers() : openSidebarDrawer();
+};
+
+$('split-btn').onclick=function(){
+  splitMode=!splitMode; this.classList.toggle('active',splitMode);
+  if(splitMode){
+    const other=[...terms.keys()].find(id=>id!==primaryTab);
+    if(other) splitTab=other;
+    else{ splitMode=false; this.classList.remove('active'); toast('Open another terminal first','warn'); return; }
+  }
+  showPanes();
+};
+
+$('notify-btn').onclick=async function(){
+  if(Notification.permission==='granted'){ this.classList.add('active'); return; }
+  const p=await Notification.requestPermission();
+  if(p==='granted'){ this.classList.add('active'); toast('Notifications enabled','success'); }
+  else toast('Notification permission denied','warn');
+};
+
+$('panel-toggle-btn').onclick=function(){
+  if(isSmallScreen()){
+    $('right-panel').classList.contains('drawer-open') ? closeDrawers() : openRightDrawer();
+  } else {
+    panelVisible=!panelVisible;
+    document.body.classList.toggle('panel-hidden',!panelVisible);
+    this.classList.toggle('active',panelVisible);
+    setTimeout(()=>{ for(const s of terms.values()) s.fit?.fit(); },60);
+  }
+};
+
+$('theme-btn').onclick=function(){ theme=theme==='dark'?'light':'dark'; applyTheme(); };
+
+// ════════════════════════════════════════════════════════════
+//  Drag-to-resize
+// ════════════════════════════════════════════════════════════
+function setupResize(handleId, cssVar, getSide){
+  const handle=$(handleId); if(!handle) return;
+  handle.addEventListener('pointerdown', e=>{
+    if(isSmallScreen()) return;
+    const startX=e.clientX, startW=getSide().getBoundingClientRect().width;
+    handle.classList.add('dragging');
+    document.body.style.cssText+='cursor:col-resize;user-select:none;';
+    e.preventDefault();
+    function onMove(e){
+      const delta=cssVar==='--sidebar-w'?e.clientX-startX:startX-e.clientX;
+      const newW=Math.max(180,Math.min(560,startW+delta));
+      document.documentElement.style.setProperty(cssVar,newW+'px');
+      localStorage.setItem('rz:'+cssVar,String(newW));
+      for(const s of terms.values()) s.fit?.fit();
+    }
+    function onUp(){
+      handle.classList.remove('dragging');
+      document.body.style.cursor=''; document.body.style.userSelect='';
+      document.removeEventListener('pointermove',onMove);
+      document.removeEventListener('pointerup',onUp);
+    }
+    document.addEventListener('pointermove',onMove);
+    document.addEventListener('pointerup',onUp);
+  });
+}
+setupResize('resize-sidebar-handle','--sidebar-w',()=>$('sidebar'));
+setupResize('resize-right-handle','--right-w',()=>$('right-panel'));
+if(!isSmallScreen()){
+  const sw=localStorage.getItem('rz:--sidebar-w'); if(sw) document.documentElement.style.setProperty('--sidebar-w',sw+'px');
+  const rw=localStorage.getItem('rz:--right-w');   if(rw) document.documentElement.style.setProperty('--right-w',rw+'px');
+}
+window.addEventListener('resize',()=>{
+  for(const s of terms.values()) if(s.fit&&s.pane.classList.contains('visible')) s.fit.fit();
+});
+
+// ════════════════════════════════════════════════════════════
+//  Theme
+// ════════════════════════════════════════════════════════════
+function applyTheme(){
+  document.body.dataset.theme=theme;
+  localStorage.setItem('i4z-theme',theme);
+  $('theme-btn').textContent=theme==='dark'?'Light':'Dark';
+  for(const s of terms.values()) if(s.xterm) s.xterm.options.theme=xtermTheme();
+}
+
+// ════════════════════════════════════════════════════════════
+//  Mobile/drawer helpers
+// ════════════════════════════════════════════════════════════
+function isMobile(){ return window.innerWidth<640 }
+function isSmallScreen(){ return window.innerWidth<1024 }
+function closeDrawers(){
+  $('sidebar').classList.remove('drawer-open');
+  $('right-panel').classList.remove('drawer-open');
+  $('overlay').classList.remove('visible');
+}
+function openSidebarDrawer(){
+  $('sidebar').classList.add('drawer-open');
+  $('right-panel').classList.remove('drawer-open');
+  $('overlay').classList.add('visible');
+}
+function openRightDrawer(){
+  $('right-panel').classList.add('drawer-open');
+  $('sidebar').classList.remove('drawer-open');
+  $('overlay').classList.add('visible');
+  $('right-panel').style.display='flex';
+}
+$('overlay').onclick=closeDrawers;
+
+// Sidebar URL copy
+$('sidebar-url').onclick=function(){
+  const url=this.textContent;
+  if(!url) return;
+  navigator.clipboard?.writeText(url).then(()=>toast('URL copied','success')).catch(()=>{});
+};
+
+// ════════════════════════════════════════════════════════════
 //  Boot
-// ════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
 applyTheme();
 
-// On small screens the panel starts hidden (it's a drawer, not inline)
 if(isSmallScreen()){
-  panelVisible = false;
+  panelVisible=false;
   document.body.classList.add('panel-hidden');
   $('panel-toggle-btn').classList.remove('active');
-} else {
-  $('panel-toggle-btn').classList.add('active');
 }
 
 if(Notification.permission==='granted') $('notify-btn').classList.add('active');
+
+// Load server info
+api('/api/info').then(d=>{
+  const el=$('server-version'); if(!el) return;
+  el.textContent=`v${d.version||'?'} · ${d.implementation||'?'}`;
+  if(d.web_url){ $('sidebar-url').textContent=d.web_url; $('sidebar-url').title='Click to copy: '+d.web_url; }
+  console.info(`[i4z] ${d.name} v${d.version} (${d.implementation}) — ${d.web_url||location.origin}`);
+}).catch(e=>console.warn('[i4z] info failed:', e.message));
 
 // Initial loads
 refreshSidebar();
 loadHealth();
 loadWorkspaces();
-api('/api/info').then(d=>{
-  const el=$('server-version');
-  if(el) el.textContent=`v${d.version||'?'} (${d.implementation||'?'})`;
-}).catch(()=>{});
 
 // Polling
-setInterval(refreshSidebar, 3000);
-setInterval(loadHealth, 6000);
-setInterval(loadAlertEvents, 8000);
+setInterval(refreshSidebar,  3000);
+setInterval(loadHealth,      8000);
+setInterval(loadAlertEvents, 7000);
 </script>
 </body>
 </html>

@@ -79,10 +79,10 @@ test:
 	cd rust && cargo test -- --nocapture
 
 rs-test-web: rs-release
-	@echo "Starting Rust server on port 9021..."
-	@I4Z_TERMINAL_WEB_PORT=9021 ./rust/target/release/i4z-terminal-mcp &
+	@echo "Starting Rust server on port 9021 (fresh tmp DB)..."
+	@I4Z_TERMINAL_WEB_PORT=9021 I4Z_TERMINAL_STATE_DIR=/tmp/i4z-test-$$$$ ./rust/target/release/i4z-terminal-mcp &
 	@sleep 1
-	@BASE_URL=http://localhost:9021 bunx playwright@latest --browser chromium node test.mjs; \
+	@BASE_URL=http://localhost:9021 bun test.mjs; \
 	  STATUS=$$?; \
 	  pkill -f "i4z-terminal-mcp" 2>/dev/null || true; \
 	  exit $$STATUS

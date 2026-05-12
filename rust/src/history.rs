@@ -174,9 +174,19 @@ impl History {
         )
         .execute(pool)
         .await?;
+        // Migrations: rename old schema columns (kind→type, data→text, ts→timestamp)
+        let _ = sqlx::query("ALTER TABLE events RENAME COLUMN kind TO type").execute(pool).await;
+        let _ = sqlx::query("ALTER TABLE events RENAME COLUMN data TO text").execute(pool).await;
+        let _ = sqlx::query("ALTER TABLE events RENAME COLUMN ts TO timestamp").execute(pool).await;
         // Migrations: add columns added after initial DB creation
         let _ = sqlx::query(
             "ALTER TABLE events ADD COLUMN type TEXT NOT NULL DEFAULT 'output'",
+        ).execute(pool).await;
+        let _ = sqlx::query(
+            "ALTER TABLE events ADD COLUMN text TEXT NOT NULL DEFAULT ''",
+        ).execute(pool).await;
+        let _ = sqlx::query(
+            "ALTER TABLE events ADD COLUMN timestamp TEXT NOT NULL DEFAULT '1970-01-01T00:00:00Z'",
         ).execute(pool).await;
         let _ = sqlx::query(
             "ALTER TABLE session_profiles ADD COLUMN startup_json TEXT NOT NULL DEFAULT '[]'",
