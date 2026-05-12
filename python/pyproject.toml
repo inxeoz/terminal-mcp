@@ -7,7 +7,7 @@ name = "i4z-terminal-mcp"
 version = "0.5.6"
 description = "MCP server for persistent interactive terminal orchestration"
 license = "MIT"
-readme = "README.md"
+readme = "../README.md"
 requires-python = ">=3.11"
 dependencies = [
     "mcp>=1.0.0",

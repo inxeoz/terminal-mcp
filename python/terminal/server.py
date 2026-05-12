@@ -242,6 +242,9 @@ async def _handle_tool(name: str, args: dict) -> dict:
         manager.resize(args["terminal_id"], int(args["rows"]), int(args["cols"]))
         return {"status": "resized", "terminal_id": args["terminal_id"], "rows": args["rows"], "cols": args["cols"]}
 
+    if name == "delete_terminal":
+        return await manager.delete_terminal(args["terminal_id"])
+
     raise ValueError(f"Unknown tool: {name}")
 
 

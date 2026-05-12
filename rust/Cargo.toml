@@ -1,0 +1,60 @@
+[package]
+name = "i4z-terminal-mcp"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "i4z-terminal-mcp"
+path = "src/main.rs"
+
+[[bin]]
+name = "bench"
+path = "src/bin/bench.rs"
+
+[[bin]]
+name = "stress"
+path = "src/bin/stress.rs"
+
+[dependencies]
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# MCP server (official Rust SDK)
+rmcp = { version = "0.11", features = ["server", "transport-io"] }
+schemars = "1"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# PTY (async, tokio-native)
+pty-process = { version = "0.5", features = ["async"] }
+libc = "0.2"
+
+# Web server + WebSocket
+actix-web = "4"
+actix-ws = "0.4"
+actix-cors = "0.7"
+
+# Database (async SQLite)
+sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio", "macros"] }
+
+# Utilities
+anyhow = "1"
+regex = "1"
+lazy_static = "1"
+dashmap = "6"
+bytes = "1"
+base64 = { version = "0.22", features = ["std"] }
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[dev-dependencies]
+reqwest = { version = "0.12", features = ["json"] }
+tempfile = "3"
+
+[[test]]
+name = "parity"
+path = "tests/parity.rs"

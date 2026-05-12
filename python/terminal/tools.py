@@ -409,4 +409,15 @@ TOOLS = [
             "required": ["terminal_id", "rows", "cols"],
         },
     ),
+    Tool(
+        name="delete_terminal",
+        description="Permanently delete a terminal session and all its history. Kills the process if still alive.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "terminal_id": {"type": "string", "description": "Terminal ID to delete"},
+            },
+            "required": ["terminal_id"],
+        },
+    ),
 ]

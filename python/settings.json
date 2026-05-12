@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "defaultMode": "auto"
+  },
+  "skipAutoPermissionPrompt": true,
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ast-outline hook --protocol claude-code --min-lines 200"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,14 +1,4 @@
-import asyncio
-
-from starlette.applications import Starlette
-from starlette.middleware import Middleware
-from starlette.middleware.cors import CORSMiddleware
-from starlette.requests import Request
-from starlette.responses import HTMLResponse, JSONResponse
-from starlette.routing import Route, WebSocketRoute
-from starlette.websockets import WebSocket, WebSocketDisconnect
-
-HTML = """<!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -91,6 +81,9 @@ body{display:flex;flex-direction:column;font-family:monospace;background:var(--b
 .tab .tab-dot.off{background:var(--danger)}
 .tab-close{background:none;border:none;color:inherit;cursor:pointer;padding:4px;border-radius:3px;font-size:13px;opacity:.5;line-height:1;touch-action:manipulation;min-width:24px;min-height:24px}
 .tab-close:hover{opacity:1;background:var(--button)}
+.term-del{background:none;border:none;color:inherit;cursor:pointer;padding:3px 5px;border-radius:3px;font-size:12px;opacity:0;margin-left:auto;touch-action:manipulation;line-height:1;flex-shrink:0}
+.term-item:hover .term-del{opacity:.4}
+.term-del:hover{opacity:1!important;color:var(--danger)}
 #tab-placeholder{display:flex;align-items:center;padding:0 14px;font-size:12px;color:var(--muted-2)}
 #terminals-wrap{flex:1;display:flex;overflow:hidden;position:relative}
 .term-pane{flex:1;display:none;flex-direction:column;overflow:hidden;min-width:0}
@@ -207,6 +200,7 @@ body.panel-hidden #resize-right-handle{display:none}
 <header id="header">
   <button class="hdr-btn" id="hamburger-btn" title="Toggle sidebar" aria-label="Toggle sidebar">&#9776;</button>
   <span class="brand">i4z-terminal-mcp</span>
+  <span id="server-version" style="font-size:10px;color:var(--muted-2);margin-left:2px"></span>
   <span id="health-dot" title="Health"></span>
   <span id="health-text">loading...</span>
   <button class="hdr-btn" id="split-btn" title="Toggle split view">Split</button>
@@ -506,7 +500,7 @@ function connectWS(state){
           if(e.type==='output') state.xterm.write(e.text);
           else if(e.type==='input'){
             // show user input hint in muted colour
-            state.xterm.write('\\x1b[2m'+e.text+'\\x1b[0m');
+            state.xterm.write('\x1b[2m'+e.text+'\x1b[0m');
           }
         }
         if(state.fit) state.fit.fit();
@@ -726,12 +720,27 @@ function renderSidebar(data){
     label.className='term-label';
     label.textContent=t.id;
     info.appendChild(label);
+    const del = document.createElement('button');
+    del.className='term-del';
+    del.title='Delete terminal and all history';
+    del.textContent='×';
+    del.onclick=e=>{e.stopPropagation();deleteTerminal(t.id)};
     item.appendChild(dot);
     item.appendChild(info);
+    item.appendChild(del);
     item.onclick=()=>openTab(t.id);
     item.ondblclick=e=>{e.stopPropagation();startRename(item,t.id)};
     list.appendChild(item);
   }
+}
+
+async function deleteTerminal(id){
+  if(!confirm(`Delete terminal "${id}" and all its history? This cannot be undone.`)) return;
+  try{
+    await api('/api/terminals/'+encodeURIComponent(id),{method:'DELETE'});
+    if(terms.has(id)) closeTab(id);
+    await refreshSidebar();
+  }catch(e){ alert(e.message||'delete failed') }
 }
 
 function startRename(item, id){
@@ -798,7 +807,7 @@ async function sendCommand(){
   cmdHistIdx=-1;
   pushCmdHistory(primaryTab,text);
   try{
-    await api('/api/send/'+encodeURIComponent(primaryTab),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text+'\\n'})});
+    await api('/api/send/'+encodeURIComponent(primaryTab),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text+'\n'})});
   }catch{}
 }
 
@@ -835,7 +844,7 @@ $('clear-btn').onclick=()=>{
   if(state && state.xterm) state.xterm.clear();
   if(primaryTab){
     const s=terms.get(primaryTab);
-    if(s&&s.ws&&s.ws.readyState===1) s.ws.send(JSON.stringify({type:'input',text:'\\x0c'}));
+    if(s&&s.ws&&s.ws.readyState===1) s.ws.send(JSON.stringify({type:'input',text:'\x0c'}));
   }
 };
 
@@ -1000,7 +1009,7 @@ async function loadProfile(){
   try{
     const d=await api('/api/profile/'+encodeURIComponent(primaryTab));
     $('prof-view').textContent=JSON.stringify(d,null,2);
-    $('prof-startup').value=(d.startup_commands||[]).join('\\n');
+    $('prof-startup').value=(d.startup_commands||[]).join('\n');
   }catch(e){ $('prof-view').textContent=e.message||'unavailable' }
 }
 $('prof-set-btn').onclick=async()=>{
@@ -1017,7 +1026,7 @@ $('prof-unset-btn').onclick=async()=>{
 };
 $('prof-save-btn').onclick=async()=>{
   if(!primaryTab) return;
-  const startup_commands=$('prof-startup').value.split('\\n').map(s=>s.trim()).filter(Boolean);
+  const startup_commands=$('prof-startup').value.split('\n').map(s=>s.trim()).filter(Boolean);
   const run_startup_commands=$('prof-run-now').checked;
   try{ await api('/api/profile/'+encodeURIComponent(primaryTab),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({startup_commands,run_startup_commands})}); loadProfile() }catch(e){alert(e.message)}
 };
@@ -1043,7 +1052,7 @@ async function loadWorkspaceDetail(){
     const d=await api('/api/workspaces/'+encodeURIComponent(id));
     $('ws-view').textContent=JSON.stringify(d,null,2);
     $('ws-env-json').value=JSON.stringify(d.env||{},null,2);
-    $('ws-startup').value=(d.startup_commands||[]).join('\\n');
+    $('ws-startup').value=(d.startup_commands||[]).join('\n');
   }catch(e){ $('ws-view').textContent=e.message }
 }
 $('ws-select').onchange=loadWorkspaceDetail;
@@ -1055,7 +1064,7 @@ $('ws-create-btn').onclick=async()=>{
     let env={};
     const raw=$('ws-env-json').value.trim();
     if(raw) env=JSON.parse(raw);
-    const startup_commands=$('ws-startup').value.split('\\n').map(s=>s.trim()).filter(Boolean);
+    const startup_commands=$('ws-startup').value.split('\n').map(s=>s.trim()).filter(Boolean);
     await api('/api/workspaces',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({workspace_id,env,startup_commands})});
     $('ws-id-input').value='';
     loadWorkspaces();
@@ -1068,7 +1077,7 @@ $('ws-save-btn').onclick=async()=>{
     let set_env={};
     const raw=$('ws-env-json').value.trim();
     if(raw) set_env=JSON.parse(raw);
-    const startup_commands=$('ws-startup').value.split('\\n').map(s=>s.trim()).filter(Boolean);
+    const startup_commands=$('ws-startup').value.split('\n').map(s=>s.trim()).filter(Boolean);
     await api('/api/workspaces/'+encodeURIComponent(id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({set_env,startup_commands,apply_to_members:true})});
     loadWorkspaceDetail(); loadProfile();
   }catch(e){alert(e.message)}
@@ -1111,7 +1120,7 @@ async function loadAlertEvents(){
         row.innerHTML=`<span class="lname">${esc(e.terminal_id)}: ${esc(e.pattern)} → ${esc((e.matched_text||'').slice(0,60))}</span>`;
         list.prepend(row);
         // Browser notification
-        notify('Alert: '+e.pattern,'Terminal: '+e.terminal_id+'\\n'+e.matched_text);
+        notify('Alert: '+e.pattern,'Terminal: '+e.terminal_id+'\n'+e.matched_text);
       }
       // Badge
       const badge=$('alert-count-badge');
@@ -1213,6 +1222,10 @@ if(Notification.permission==='granted') $('notify-btn').classList.add('active');
 refreshSidebar();
 loadHealth();
 loadWorkspaces();
+api('/api/info').then(d=>{
+  const el=$('server-version');
+  if(el) el.textContent=`v${d.version||'?'} (${d.implementation||'?'})`;
+}).catch(()=>{});
 
 // Polling
 setInterval(refreshSidebar, 3000);
@@ -1220,416 +1233,4 @@ setInterval(loadHealth, 6000);
 setInterval(loadAlertEvents, 8000);
 </script>
 </body>
-</html>"""
-
-
-def create_app(manager):
-    from terminal.log import log
-
-    async def index(request):
-        log("GET /", "WEB")
-        return HTMLResponse(HTML)
-
-    async def api_terminals(request):
-        log("GET /api/terminals", "WEB")
-        return JSONResponse(manager.list_all())
-
-    async def api_create(request: Request):
-        body = await request.json()
-        name = str(body.get("name", "")).strip()
-        if not name:
-            return JSONResponse({"error": "terminal name cannot be empty"}, status_code=400)
-        interactive = bool(body.get("interactive", False))
-        try:
-            session = await manager.create(
-                name,
-                env=body.get("env"),
-                startup_commands=body.get("startup_commands"),
-                workspace_id=body.get("workspace_id"),
-                interactive=interactive,
-            )
-            log(f"POST /api/create '{session.id}' interactive={interactive}", "WEB")
-            return JSONResponse({"terminal_id": session.id, "status": "created"})
-        except ValueError as e:
-            return JSONResponse({"error": str(e)}, status_code=400)
-
-    async def api_kill(request):
-        terminal_id = request.path_params["terminal_id"]
-        try:
-            await manager.kill(terminal_id)
-            log(f"POST /api/kill/{terminal_id}", "WEB")
-            return JSONResponse({"status": "killed"})
-        except KeyError:
-            return JSONResponse({"error": "terminal not found"}, status_code=404)
-
-    async def api_rename(request: Request):
-        terminal_id = request.path_params["terminal_id"]
-        body = await request.json()
-        new_id = str(body.get("new_id", "")).strip()
-        if not new_id:
-            return JSONResponse({"error": "new_id cannot be empty"}, status_code=400)
-        try:
-            result = manager.rename(terminal_id, new_id)
-            log(f"POST /api/rename '{terminal_id}' -> '{new_id}'", "WEB")
-            return JSONResponse(result)
-        except ValueError as e:
-            return JSONResponse({"error": str(e)}, status_code=400)
-        except KeyError as e:
-            return JSONResponse({"error": str(e)}, status_code=404)
-
-    async def api_resize(request: Request):
-        terminal_id = request.path_params["terminal_id"]
-        body = await request.json()
-        rows = int(body.get("rows", 24))
-        cols = int(body.get("cols", 80))
-        manager.resize(terminal_id, rows, cols)
-        return JSONResponse({"status": "resized", "rows": rows, "cols": cols})
-
-    async def api_status(request):
-        terminal_id = request.path_params["terminal_id"]
-        try:
-            return JSONResponse(manager.status(terminal_id))
-        except KeyError:
-            return JSONResponse({"error": "not found"}, status_code=404)
-
-    async def api_profile(request):
-        terminal_id = request.path_params["terminal_id"]
-        try:
-            return JSONResponse(manager.get_profile(terminal_id))
-        except KeyError:
-            return JSONResponse({"error": "terminal not found"}, status_code=404)
-
-    async def api_profile_update(request: Request):
-        terminal_id = request.path_params["terminal_id"]
-        body = await request.json()
-        try:
-            result = manager.get_profile(terminal_id)
-            for key, value in (body.get("set_env") or {}).items():
-                result = manager.set_env(terminal_id, key, str(value))
-            for key in body.get("unset_env") or []:
-                result = manager.unset_env(terminal_id, key)
-            if "startup_commands" in body:
-                result = manager.set_startup_commands(terminal_id, [str(cmd) for cmd in body.get("startup_commands") or []])
-            if body.get("run_startup_commands"):
-                manager.run_startup_commands(terminal_id, [str(cmd) for cmd in body.get("startup_commands") or []] if "startup_commands" in body else None)
-                result = manager.get_profile(terminal_id)
-            return JSONResponse(result)
-        except KeyError:
-            return JSONResponse({"error": "terminal not found"}, status_code=404)
-        except ValueError as e:
-            return JSONResponse({"error": str(e)}, status_code=400)
-
-    async def api_signal(request: Request):
-        terminal_id = request.path_params["terminal_id"]
-        body = await request.json()
-        sig = str(body.get("signal", "SIGINT"))
-        try:
-            manager.signal(terminal_id, sig)
-            return JSONResponse({"status": "signaled"})
-        except KeyError:
-            return JSONResponse({"error": "terminal not found"}, status_code=404)
-        except ValueError as e:
-            return JSONResponse({"error": str(e)}, status_code=400)
-
-    async def api_workspaces(request):
-        log("GET /api/workspaces", "WEB")
-        return JSONResponse(manager.list_workspaces())
-
-    async def api_workspace_create(request: Request):
-        body = await request.json()
-        workspace_id = str(body.get("workspace_id", "")).strip()
-        if not workspace_id:
-            return JSONResponse({"error": "workspace_id cannot be empty"}, status_code=400)
-        try:
-            ws = manager.create_workspace(workspace_id, body.get("env"), body.get("startup_commands"))
-            log(f"POST /api/workspaces '{workspace_id}'", "WEB")
-            return JSONResponse(ws)
-        except ValueError as e:
-            return JSONResponse({"error": str(e)}, status_code=400)
-
-    async def api_workspace_item(request):
-        workspace_id = request.path_params["workspace_id"]
-        try:
-            return JSONResponse(manager.workspace_status(workspace_id))
-        except KeyError:
-            return JSONResponse({"error": "workspace not found"}, status_code=404)
-
-    async def api_workspace_update(request: Request):
-        workspace_id = request.path_params["workspace_id"]
-        body = await request.json()
-        try:
-            ws = manager.configure_workspace(
-                workspace_id,
-                body.get("set_env"),
-                body.get("unset_env"),
-                body.get("startup_commands"),
-                bool(body.get("apply_to_members", True)),
-            )
-            return JSONResponse(ws)
-        except KeyError:
-            return JSONResponse({"error": "workspace not found"}, status_code=404)
-
-    async def api_workspace_add_member(request: Request):
-        workspace_id = request.path_params["workspace_id"]
-        body = await request.json()
-        terminal_id = str(body.get("terminal_id", "")).strip()
-        if not terminal_id:
-            return JSONResponse({"error": "terminal_id cannot be empty"}, status_code=400)
-        try:
-            ws = manager.add_terminal_to_workspace(workspace_id, terminal_id)
-            return JSONResponse(ws)
-        except KeyError as e:
-            return JSONResponse({"error": str(e)}, status_code=404)
-
-    async def api_workspace_remove_member(request: Request):
-        workspace_id = request.path_params["workspace_id"]
-        terminal_id = request.path_params["terminal_id"]
-        try:
-            ws = manager.remove_terminal_from_workspace(workspace_id, terminal_id)
-            return JSONResponse(ws)
-        except KeyError as e:
-            return JSONResponse({"error": str(e)}, status_code=404)
-
-    async def api_workspace_apply(request: Request):
-        workspace_id = request.path_params["workspace_id"]
-        body = await request.json()
-        try:
-            return JSONResponse(manager.apply_workspace(workspace_id, body.get("terminal_id")))
-        except KeyError as e:
-            return JSONResponse({"error": str(e)}, status_code=404)
-
-    async def api_history(request):
-        terminal_id = request.path_params["terminal_id"]
-        since = int(request.query_params.get("since", 0))
-        try:
-            data = manager.get_history(terminal_id, since)
-            log(f"GET /api/history/{terminal_id}?since={since} -> {len(data['events'])} events", "WEB")
-            return JSONResponse(data)
-        except KeyError:
-            log(f"GET /api/history/{terminal_id} -> 404", "WEB")
-            return JSONResponse({"events": [], "cursor": since}, status_code=404)
-
-    async def api_search(request):
-        terminal_id = request.path_params["terminal_id"]
-        query = request.query_params.get("query", "").strip()
-        if not query:
-            return JSONResponse({"error": "missing query"}, status_code=400)
-        try:
-            data = manager.search(terminal_id, query)
-            log(f"GET /api/search/{terminal_id}?query={query!r} -> {len(data['matches'])} matches", "WEB")
-            return JSONResponse(data)
-        except KeyError:
-            return JSONResponse({"error": "terminal not found"}, status_code=404)
-
-    async def api_health(request):
-        log("GET /api/health", "WEB")
-        return JSONResponse(manager.health())
-
-    async def api_alerts(request):
-        terminal_id = request.query_params.get("terminal_id")
-        scope = request.query_params.get("scope")
-        return JSONResponse(manager.list_alerts(scope, terminal_id))
-
-    async def api_alert_create(request: Request):
-        body = await request.json()
-        scope = str(body.get("scope", "session")).strip()
-        pattern = str(body.get("pattern", "")).strip()
-        label = str(body.get("label", "")).strip() or None
-        terminal_id = body.get("terminal_id")
-        if not pattern:
-            return JSONResponse({"error": "pattern cannot be empty"}, status_code=400)
-        try:
-            return JSONResponse(manager.add_alert(scope, pattern, terminal_id, label))
-        except ValueError as e:
-            return JSONResponse({"error": str(e)}, status_code=400)
-
-    async def api_alert_remove(request: Request):
-        alert_id = request.path_params["alert_id"]
-        return JSONResponse({"removed": manager.remove_alert(alert_id), "alert_id": alert_id})
-
-    async def api_alert_events(request):
-        terminal_id = request.query_params.get("terminal_id")
-        since = int(request.query_params.get("since", 0))
-        return JSONResponse(manager.list_alert_events(terminal_id, since))
-
-    async def api_checkpoints(request):
-        terminal_id = request.query_params.get("terminal_id")
-        if request.method == "GET":
-            return JSONResponse(manager.list_checkpoints(terminal_id))
-        body = await request.json()
-        terminal_id = str(body.get("terminal_id", "")).strip()
-        label = str(body.get("label", "")).strip()
-        note = str(body.get("note", "")).strip() or None
-        if not terminal_id or not label:
-            return JSONResponse({"error": "terminal_id and label are required"}, status_code=400)
-        try:
-            return JSONResponse(manager.add_checkpoint(terminal_id, label, note, body.get("cursor")))
-        except KeyError:
-            return JSONResponse({"error": "terminal not found"}, status_code=404)
-
-    async def api_checkpoint_remove(request: Request):
-        checkpoint_id = request.path_params["checkpoint_id"]
-        return JSONResponse({"removed": manager.remove_checkpoint(checkpoint_id), "checkpoint_id": checkpoint_id})
-
-    async def api_export(request):
-        terminal_id = request.path_params["terminal_id"]
-        try:
-            return JSONResponse(manager.export_session(terminal_id))
-        except KeyError:
-            return JSONResponse({"error": "terminal not found"}, status_code=404)
-
-    async def api_import(request: Request):
-        body = await request.json()
-        snapshot = body.get("snapshot")
-        if not isinstance(snapshot, dict):
-            return JSONResponse({"error": "snapshot must be an object"}, status_code=400)
-        try:
-            return JSONResponse(await manager.import_session(snapshot, body.get("terminal_id")))
-        except ValueError as e:
-            return JSONResponse({"error": str(e)}, status_code=400)
-
-    async def api_send(request: Request):
-        terminal_id = request.path_params["terminal_id"]
-        body = await request.json()
-        text = body.get("text", "")
-        if not text:
-            return JSONResponse({"error": "missing text"}, status_code=400)
-        try:
-            manager.send(terminal_id, text)
-            log(f"POST /api/send/{terminal_id} '{text.strip()[:60]}'", "WEB")
-            return JSONResponse({"status": "sent"})
-        except KeyError:
-            return JSONResponse({"error": "terminal not found"}, status_code=404)
-        except RuntimeError as e:
-            return JSONResponse({"error": str(e)}, status_code=400)
-
-    async def ws_terminal(websocket: WebSocket):
-        terminal_id = websocket.path_params["terminal_id"]
-        since = int(websocket.query_params.get("since", 0))
-        await websocket.accept()
-        try:
-            try:
-                session = manager.get(terminal_id)
-            except KeyError:
-                history = manager.get_history(terminal_id, since)
-                await websocket.send_json({"type": "history", **history})
-                await websocket.send_json({"type": "status", "status": manager.status(terminal_id)})
-                await websocket.close()
-                return
-
-            queue: asyncio.Queue[dict] = asyncio.Queue()
-
-            def listener(text: str) -> None:
-                queue.put_nowait(
-                    {
-                        "type": "output",
-                        "text": text,
-                        "cursor": session.cursor,
-                        "timestamp": session.updated_at.isoformat(),
-                    }
-                )
-
-            session.add_output_listener(listener)
-            try:
-                try:
-                    history = manager.get_history(terminal_id, since)
-                except KeyError:
-                    history = {"events": [], "cursor": since}
-                await websocket.send_json({"type": "history", **history})
-                await websocket.send_json({"type": "status", "status": manager.status(terminal_id)})
-
-                recv_task = asyncio.create_task(websocket.receive_json())
-                queue_task = asyncio.create_task(queue.get())
-
-                while True:
-                    done, _ = await asyncio.wait(
-                        [recv_task, queue_task],
-                        return_when=asyncio.FIRST_COMPLETED,
-                        timeout=1.0,
-                    )
-
-                    if not done:
-                        if not session.alive:
-                            await websocket.send_json({"type": "status", "status": manager.status(terminal_id)})
-                            break
-                        continue
-
-                    if recv_task in done:
-                        try:
-                            msg = recv_task.result()
-                            mtype = msg.get("type") if isinstance(msg, dict) else None
-                            if mtype == "input":
-                                text = msg.get("text", "")
-                                if text:
-                                    manager.send_raw(terminal_id, text)
-                            elif mtype == "resize":
-                                rows = int(msg.get("rows", 24))
-                                cols = int(msg.get("cols", 80))
-                                manager.resize(terminal_id, rows, cols)
-                        except Exception:
-                            pass
-                        recv_task = asyncio.create_task(websocket.receive_json())
-
-                    if queue_task in done:
-                        event = queue_task.result()
-                        await websocket.send_json(event)
-                        queue_task = asyncio.create_task(queue.get())
-
-                recv_task.cancel()
-                queue_task.cancel()
-                await websocket.close()
-            finally:
-                session.remove_output_listener(listener)
-        except WebSocketDisconnect:
-            return
-        except KeyError:
-            await websocket.close(code=4404)
-        except Exception as e:
-            log(f"websocket error for '{terminal_id}': {e}", "WEB")
-            try:
-                await websocket.close(code=1011)
-            except Exception:
-                pass
-
-    middleware = [
-        Middleware(
-            CORSMiddleware,
-            allow_origins=["*"],
-            allow_methods=["*"],
-            allow_headers=["*"],
-        )
-    ]
-
-    return Starlette(routes=[
-        Route("/", index),
-        Route("/api/terminals", api_terminals),
-        Route("/api/create", api_create, methods=["POST"]),
-        Route("/api/health", api_health),
-        Route("/api/status/{terminal_id}", api_status),
-        Route("/api/profile/{terminal_id}", api_profile),
-        Route("/api/profile/{terminal_id}", api_profile_update, methods=["POST"]),
-        Route("/api/kill/{terminal_id}", api_kill, methods=["POST"]),
-        Route("/api/rename/{terminal_id}", api_rename, methods=["POST"]),
-        Route("/api/resize/{terminal_id}", api_resize, methods=["POST"]),
-        Route("/api/signal/{terminal_id}", api_signal, methods=["POST"]),
-        Route("/api/history/{terminal_id}", api_history),
-        Route("/api/search/{terminal_id}", api_search),
-        Route("/api/workspaces", api_workspaces),
-        Route("/api/workspaces", api_workspace_create, methods=["POST"]),
-        Route("/api/workspaces/{workspace_id}/members/{terminal_id}", api_workspace_remove_member, methods=["DELETE"]),
-        Route("/api/workspaces/{workspace_id}/members", api_workspace_add_member, methods=["POST"]),
-        Route("/api/workspaces/{workspace_id}/apply", api_workspace_apply, methods=["POST"]),
-        Route("/api/workspaces/{workspace_id}", api_workspace_item),
-        Route("/api/workspaces/{workspace_id}", api_workspace_update, methods=["POST"]),
-        Route("/api/alerts", api_alerts),
-        Route("/api/alerts", api_alert_create, methods=["POST"]),
-        Route("/api/alerts/{alert_id}", api_alert_remove, methods=["DELETE"]),
-        Route("/api/alert-events", api_alert_events),
-        Route("/api/checkpoints", api_checkpoints),
-        Route("/api/checkpoints", api_checkpoints, methods=["POST"]),
-        Route("/api/checkpoints/{checkpoint_id}", api_checkpoint_remove, methods=["DELETE"]),
-        Route("/api/export/{terminal_id}", api_export),
-        Route("/api/import", api_import, methods=["POST"]),
-        Route("/api/send/{terminal_id}", api_send, methods=["POST"]),
-        WebSocketRoute("/ws/{terminal_id}", ws_terminal),
-    ], middleware=middleware)
+</html>

@@ -454,6 +454,12 @@ class SessionManager:
                 pass
         self._sessions.pop(name, None)
 
+    async def delete_terminal(self, name: str) -> dict:
+        if name in self._sessions:
+            await self.kill(name)
+        self._history.delete_terminal(name)
+        return {"id": name, "deleted": True}
+
     async def shutdown(self) -> None:
         for name in list(self._sessions.keys()):
             await self.kill(name)

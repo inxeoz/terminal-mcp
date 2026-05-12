@@ -55,6 +55,16 @@ class HistoryStore:
             "  updated_at TEXT NOT NULL"
             ")"
         )
+        for col_ddl in [
+            "ALTER TABLE events ADD COLUMN type TEXT NOT NULL DEFAULT 'output'",
+            "ALTER TABLE session_profiles ADD COLUMN startup_json TEXT NOT NULL DEFAULT '[]'",
+            "ALTER TABLE session_profiles ADD COLUMN updated_at TEXT NOT NULL DEFAULT '1970-01-01T00:00:00Z'",
+        ]:
+            try:
+                self._db.execute(col_ddl)
+                self._db.commit()
+            except Exception:
+                pass
         self._db.execute(
             "CREATE TABLE IF NOT EXISTS alerts ("
             "  id TEXT PRIMARY KEY,"
@@ -110,6 +120,16 @@ class HistoryStore:
             "  updated_at TEXT NOT NULL"
             ")"
         )
+        for col_ddl in [
+            "ALTER TABLE workspaces ADD COLUMN startup_json TEXT NOT NULL DEFAULT '[]'",
+            "ALTER TABLE workspaces ADD COLUMN updated_at TEXT NOT NULL DEFAULT '1970-01-01T00:00:00Z'",
+            "ALTER TABLE workspaces ADD COLUMN created_at TEXT NOT NULL DEFAULT '1970-01-01T00:00:00Z'",
+        ]:
+            try:
+                self._db.execute(col_ddl)
+                self._db.commit()
+            except Exception:
+                pass
         self._db.execute(
             "CREATE TABLE IF NOT EXISTS workspace_members ("
             "  workspace_id TEXT NOT NULL,"
@@ -572,6 +592,17 @@ class HistoryStore:
         cur = self._db.execute("DELETE FROM workspaces WHERE id = ?", (workspace_id,))
         self._db.commit()
         return cur.rowcount > 0
+
+    def delete_terminal(self, terminal_id: str) -> bool:
+        with self._db:
+            self._db.execute("DELETE FROM events WHERE terminal_id = ?", (terminal_id,))
+            self._db.execute("DELETE FROM session_profiles WHERE terminal_id = ?", (terminal_id,))
+            self._db.execute("DELETE FROM alerts WHERE terminal_id = ? AND scope = 'session'", (terminal_id,))
+            self._db.execute("DELETE FROM alert_events WHERE terminal_id = ?", (terminal_id,))
+            self._db.execute("DELETE FROM reader_errors WHERE terminal_id = ?", (terminal_id,))
+            self._db.execute("DELETE FROM bookmarks WHERE terminal_id = ?", (terminal_id,))
+            self._db.execute("DELETE FROM workspace_members WHERE terminal_id = ?", (terminal_id,))
+        return True
 
     def rename_terminal(self, old_id: str, new_id: str) -> None:
         with self._db:
