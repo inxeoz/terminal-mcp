@@ -88,3 +88,9 @@ class TerminalSession:
             return os.readlink(f"/proc/{self.shell.pid}/cwd")
         except Exception:
             return None
+
+    def resize(self, rows: int, cols: int) -> None:
+        try:
+            self.shell.setwinsize(rows, cols)
+        except Exception:
+            pass

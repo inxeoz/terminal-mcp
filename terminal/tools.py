@@ -384,4 +384,29 @@ TOOLS = [
         description="Get the web UI URL where terminal sessions can be viewed in a browser",
         inputSchema={"type": "object", "properties": {}},
     ),
+    Tool(
+        name="rename_terminal",
+        description="Rename a terminal session. Updates all history, alerts, checkpoints, and workspace memberships.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "terminal_id": {"type": "string", "description": "Current terminal ID"},
+                "new_id": {"type": "string", "description": "New terminal ID"},
+            },
+            "required": ["terminal_id", "new_id"],
+        },
+    ),
+    Tool(
+        name="resize_terminal",
+        description="Resize the PTY dimensions for a terminal session",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "terminal_id": {"type": "string", "description": "Terminal ID"},
+                "rows": {"type": "integer", "minimum": 1, "description": "Number of rows"},
+                "cols": {"type": "integer", "minimum": 1, "description": "Number of columns"},
+            },
+            "required": ["terminal_id", "rows", "cols"],
+        },
+    ),
 ]

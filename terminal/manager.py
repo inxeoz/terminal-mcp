@@ -124,6 +124,7 @@ class SessionManager:
         startup_commands: list[str] | None = None,
         workspace_id: str | None = None,
         run_startup_commands: bool = True,
+        interactive: bool = False,
     ) -> TerminalSession:
         name = name.strip()
         _validate_route_id(name, "Terminal name")
@@ -148,16 +149,26 @@ class SessionManager:
         self._history.clear_reader_error(name)
 
         spawn_env = os.environ.copy()
-        spawn_env.update(
-            {
-                "TERM": "dumb",
-                "NO_COLOR": "1",
-                "CLICOLOR": "0",
-                "LS_COLORS": "",
-                "PS1": "$ ",
-                "PROMPT_COMMAND": "",
-            }
-        )
+        if interactive:
+            spawn_env.update(
+                {
+                    "TERM": "xterm-256color",
+                    "COLORTERM": "truecolor",
+                    "PS1": r"\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ ",
+                    "PROMPT_COMMAND": "",
+                }
+            )
+        else:
+            spawn_env.update(
+                {
+                    "TERM": "dumb",
+                    "NO_COLOR": "1",
+                    "CLICOLOR": "0",
+                    "LS_COLORS": "",
+                    "PS1": "$ ",
+                    "PROMPT_COMMAND": "",
+                }
+            )
         spawn_env.update(profile_env)
         shell = pexpect.spawn(
             "/bin/bash",
@@ -223,6 +234,35 @@ class SessionManager:
         data["profile"] = self.get_profile(name)
         data["workspaces"] = self._history.list_workspace_ids_for_terminal(name)
         return data
+
+    def rename(self, old_name: str, new_name: str) -> dict:
+        new_name = new_name.strip()
+        _validate_route_id(new_name, "Terminal name")
+        if new_name == old_name:
+            return {"old_id": old_name, "new_id": new_name}
+        if new_name in self._sessions:
+            raise ValueError(f"Terminal '{new_name}' already exists")
+        session = self._sessions.pop(old_name, None)
+        if session:
+            session.id = new_name
+            self._sessions[new_name] = session
+            session.on_output = self._make_output_callback(new_name)
+            session.on_error = lambda msg: self._history.record_reader_error(new_name, msg)
+        self._history.rename_terminal(old_name, new_name)
+        return {"old_id": old_name, "new_id": new_name}
+
+    def resize(self, name: str, rows: int, cols: int) -> None:
+        session = self._sessions.get(name)
+        if session:
+            session.resize(max(1, rows), max(1, cols))
+
+    def send_raw(self, name: str, text: str) -> None:
+        session = self._sessions.get(name)
+        if session and session.alive:
+            try:
+                session.shell.send(text)
+            except Exception:
+                pass
 
     def send(self, name: str, text: str) -> None:
         session = self.get(name)

@@ -235,6 +235,13 @@ async def _handle_tool(name: str, args: dict) -> dict:
     if name == "web_url":
         return {"url": manager.web_url}
 
+    if name == "rename_terminal":
+        return manager.rename(args["terminal_id"], args["new_id"])
+
+    if name == "resize_terminal":
+        manager.resize(args["terminal_id"], int(args["rows"]), int(args["cols"]))
+        return {"status": "resized", "terminal_id": args["terminal_id"], "rows": args["rows"], "cols": args["cols"]}
+
     raise ValueError(f"Unknown tool: {name}")
 
 
@@ -284,14 +291,16 @@ async def _main():
     if web_port == 0:
         web_port = _find_free_port()
 
+    web_host = os.environ.get("I4Z_TERMINAL_WEB_HOST", "0.0.0.0")
+
     import uvicorn
     web_app = create_app(manager)
-    web_config = uvicorn.Config(web_app, host="127.0.0.1", port=web_port, log_level="warning")
+    web_config = uvicorn.Config(web_app, host=web_host, port=web_port, log_level="warning")
     web_server = uvicorn.Server(web_config)
 
     print(f"i4z-terminal-mcp running (Ctrl+D to stop)", file=sys.stderr)
-    print(f"  Web UI: http://127.0.0.1:{web_port}", file=sys.stderr)
-    manager.web_url = f"http://127.0.0.1:{web_port}"
+    print(f"  Web UI: http://localhost:{web_port}", file=sys.stderr)
+    manager.web_url = f"http://localhost:{web_port}"
 
     async with stdio_server() as (read, write):
         await asyncio.gather(

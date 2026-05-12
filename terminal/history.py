@@ -573,5 +573,15 @@ class HistoryStore:
         self._db.commit()
         return cur.rowcount > 0
 
+    def rename_terminal(self, old_id: str, new_id: str) -> None:
+        with self._db:
+            self._db.execute("UPDATE events SET terminal_id=? WHERE terminal_id=?", (new_id, old_id))
+            self._db.execute("UPDATE session_profiles SET terminal_id=? WHERE terminal_id=?", (new_id, old_id))
+            self._db.execute("UPDATE alerts SET terminal_id=? WHERE terminal_id=?", (new_id, old_id))
+            self._db.execute("UPDATE alert_events SET terminal_id=? WHERE terminal_id=?", (new_id, old_id))
+            self._db.execute("UPDATE reader_errors SET terminal_id=? WHERE terminal_id=?", (new_id, old_id))
+            self._db.execute("UPDATE bookmarks SET terminal_id=? WHERE terminal_id=?", (new_id, old_id))
+            self._db.execute("UPDATE workspace_members SET terminal_id=? WHERE terminal_id=?", (new_id, old_id))
+
     def close(self) -> None:
         self._db.close()
