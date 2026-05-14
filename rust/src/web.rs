@@ -429,6 +429,39 @@ async fn api_import(mgr: Data, body: web::Json<ImportBody>) -> impl Responder {
     }
 }
 
+// ── Config ────────────────────────────────────────────────────────────────────
+
+async fn api_config_get(mgr: Data) -> impl Responder {
+    match mgr.get_all_config().await {
+        Ok(v) => ok(v),
+        Err(e) => err(e),
+    }
+}
+
+#[derive(Deserialize)]
+struct ConfigUpdateBody {
+    #[serde(default)]
+    sidebar_refresh_ms: Option<u64>,
+    #[serde(default)]
+    health_check_ms: Option<u64>,
+    #[serde(default)]
+    alert_events_ms: Option<u64>,
+    #[serde(default)]
+    ws_reconnect_ms: Option<u64>,
+}
+
+async fn api_config_update(mgr: Data, body: web::Json<ConfigUpdateBody>) -> impl Responder {
+    let mut updates = std::collections::HashMap::new();
+    if let Some(v) = body.sidebar_refresh_ms { updates.insert("sidebar_refresh_ms".to_string(), v); }
+    if let Some(v) = body.health_check_ms    { updates.insert("health_check_ms".to_string(), v); }
+    if let Some(v) = body.alert_events_ms   { updates.insert("alert_events_ms".to_string(), v); }
+    if let Some(v) = body.ws_reconnect_ms   { updates.insert("ws_reconnect_ms".to_string(), v); }
+    match mgr.set_config_values(updates).await {
+        Ok(v) => ok(v),
+        Err(e) => err(e),
+    }
+}
+
 // ── WebSocket (JSON protocol, matching Python) ────────────────────────────────
 
 #[derive(serde::Deserialize)]
@@ -611,6 +644,8 @@ pub async fn run(manager: Arc<Manager>, host: &str, port: u16) -> std::io::Resul
             .route("/api/checkpoints/{id}", web::delete().to(api_checkpoint_remove))
             .route("/api/export/{id}", web::get().to(api_export))
             .route("/api/import", web::post().to(api_import))
+            .route("/api/config", web::get().to(api_config_get))
+            .route("/api/config", web::post().to(api_config_update))
             .route("/ws/{id}", web::get().to(ws_terminal))
     })
     .bind((host, port))?

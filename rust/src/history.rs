@@ -385,6 +385,14 @@ impl History {
         // Repair tables that ended up with mixed old+new columns due to partial prior migrations
         Self::repair_events_table(pool).await?;
         Self::repair_alert_events_table(pool).await?;
+        sqlx::query(
+            "CREATE TABLE IF NOT EXISTS config (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            )",
+        )
+        .execute(pool)
+        .await?;
         Ok(())
     }
 
@@ -983,6 +991,32 @@ impl History {
             "workspaces": workspaces,
             "workspace_members": workspace_members,
         }))
+    }
+
+    // ── server config ─────────────────────────────────────────────────────────
+
+    pub async fn get_config(&self, key: &str) -> Result<Option<String>> {
+        let row: Option<(String,)> = sqlx::query_as("SELECT value FROM config WHERE key = ?")
+            .bind(key)
+            .fetch_optional(&self.pool)
+            .await?;
+        Ok(row.map(|(v,)| v))
+    }
+
+    pub async fn set_config(&self, key: &str, value: &str) -> Result<()> {
+        sqlx::query("INSERT INTO config(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
+            .bind(key)
+            .bind(value)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn all_config(&self) -> Result<std::collections::HashMap<String, String>> {
+        let rows: Vec<(String, String)> = sqlx::query_as("SELECT key, value FROM config ORDER BY key")
+            .fetch_all(&self.pool)
+            .await?;
+        Ok(rows.into_iter().collect())
     }
 }
 

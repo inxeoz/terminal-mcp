@@ -876,4 +876,45 @@ impl Manager {
         }
         Ok(())
     }
+
+    // ── server config ─────────────────────────────────────────────────────────
+
+    /// Defaults used when a key has never been explicitly set.
+    pub fn config_defaults() -> std::collections::HashMap<&'static str, u64> {
+        [
+            ("sidebar_refresh_ms", 3000u64),
+            ("health_check_ms",    8000),
+            ("alert_events_ms",    7000),
+            ("ws_reconnect_ms",    1500),
+        ]
+        .into_iter()
+        .collect()
+    }
+
+    pub async fn get_all_config(&self) -> anyhow::Result<serde_json::Value> {
+        let stored = self.history.all_config().await?;
+        let defaults = Self::config_defaults();
+        let mut out = serde_json::Map::new();
+        for (k, def) in &defaults {
+            let v: u64 = stored
+                .get(*k)
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(*def);
+            out.insert(k.to_string(), serde_json::json!(v));
+        }
+        Ok(serde_json::Value::Object(out))
+    }
+
+    pub async fn set_config_values(&self, updates: std::collections::HashMap<String, u64>) -> anyhow::Result<serde_json::Value> {
+        let defaults = Self::config_defaults();
+        let mut applied = serde_json::Map::new();
+        for (k, v) in updates {
+            if !defaults.contains_key(k.as_str()) {
+                return Err(anyhow::anyhow!("Unknown config key: {k}"));
+            }
+            self.history.set_config(&k, &v.to_string()).await?;
+            applied.insert(k, serde_json::json!(v));
+        }
+        self.get_all_config().await
+    }
 }

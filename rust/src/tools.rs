@@ -200,6 +200,18 @@ struct DeleteTerminalInput {
     terminal_id: String,
 }
 
+#[derive(Debug, Deserialize, JsonSchema, Default)]
+struct ConfigureServerInput {
+    /// Terminal-list sidebar refresh interval in ms (100–60000). Omit to keep current.
+    sidebar_refresh_ms: Option<u64>,
+    /// Health status poll interval in ms (1000–60000). Omit to keep current.
+    health_check_ms: Option<u64>,
+    /// Alert-events poll interval in ms (1000–60000). Omit to keep current.
+    alert_events_ms: Option<u64>,
+    /// WebSocket reconnect delay in ms (200–10000). Omit to keep current.
+    ws_reconnect_ms: Option<u64>,
+}
+
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 fn ok(v: impl serde::Serialize) -> Result<CallToolResult, McpError> {
@@ -636,6 +648,30 @@ impl TerminalMcpServer {
         match self.manager.delete_terminal(&p.terminal_id).await {
             Ok(v) => ok(v),
             Err(e) => tool_err(e),
+        }
+    }
+
+    #[tool(description = "Read or update server polling configuration. Call with no arguments to read current values. Provide one or more fields to update them. All values are in milliseconds.")]
+    async fn configure(
+        &self,
+        Parameters(p): Parameters<ConfigureServerInput>,
+    ) -> Result<CallToolResult, McpError> {
+        let mut updates = HashMap::new();
+        if let Some(v) = p.sidebar_refresh_ms { updates.insert("sidebar_refresh_ms".to_string(), v.clamp(100, 60_000)); }
+        if let Some(v) = p.health_check_ms    { updates.insert("health_check_ms".to_string(),    v.clamp(1_000, 60_000)); }
+        if let Some(v) = p.alert_events_ms    { updates.insert("alert_events_ms".to_string(),    v.clamp(1_000, 60_000)); }
+        if let Some(v) = p.ws_reconnect_ms    { updates.insert("ws_reconnect_ms".to_string(),    v.clamp(200, 10_000)); }
+
+        if updates.is_empty() {
+            match self.manager.get_all_config().await {
+                Ok(v) => ok(v),
+                Err(e) => tool_err(e),
+            }
+        } else {
+            match self.manager.set_config_values(updates).await {
+                Ok(v) => ok(v),
+                Err(e) => tool_err(e),
+            }
         }
     }
 }

@@ -520,6 +520,7 @@ body.panel-hidden #resize-right-handle{display:none}
 .ptab[data-panel="checkpoints"]::before{content:"⊛ ";opacity:.6}
 .ptab[data-panel="search"]::before     {content:"◎ ";opacity:.6}
 .ptab[data-panel="snapshots"]::before  {content:"⊡ ";opacity:.6}
+.ptab[data-panel="config"]::before     {content:"⚙ ";opacity:.6}
 
 #alert-badge{
   display:inline-block;
@@ -839,6 +840,7 @@ body[data-theme="light"] .p-select{
     <button class="ptab" data-panel="checkpoints">Checks</button>
     <button class="ptab" data-panel="search">Search</button>
     <button class="ptab" data-panel="snapshots">Snaps</button>
+    <button class="ptab" data-panel="config">Config</button>
   </div>
   <div id="panel-body">
 
@@ -956,6 +958,33 @@ body[data-theme="light"] .p-select{
       </div>
       <textarea class="p-textarea mt-8" id="snap-json" placeholder="Exported JSON appears here. Paste JSON and click Import to restore a session." rows="6"></textarea>
       <div class="p-pre mt-8" id="snap-status">No snapshot loaded</div>
+    </div>
+
+    <div class="panel-section" id="section-config">
+      <div class="section-title">Polling Intervals</div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px">
+        <div class="field-row">
+          <label style="width:145px;flex-shrink:0">Sidebar refresh (ms)</label>
+          <input class="p-input" type="number" id="cfg-sidebar" min="500" max="60000" step="100" placeholder="3000">
+        </div>
+        <div class="field-row">
+          <label style="width:145px;flex-shrink:0">Health check (ms)</label>
+          <input class="p-input" type="number" id="cfg-health" min="500" max="60000" step="100" placeholder="8000">
+        </div>
+        <div class="field-row">
+          <label style="width:145px;flex-shrink:0">Alert events (ms)</label>
+          <input class="p-input" type="number" id="cfg-alerts" min="500" max="60000" step="100" placeholder="7000">
+        </div>
+        <div class="field-row">
+          <label style="width:145px;flex-shrink:0">WS reconnect (ms)</label>
+          <input class="p-input" type="number" id="cfg-wsrecon" min="200" max="30000" step="100" placeholder="1500">
+        </div>
+      </div>
+      <div class="field-row">
+        <button class="p-btn primary" id="cfg-save-btn">Save &amp; Apply</button>
+        <button class="p-btn" id="cfg-reset-btn">Reset to Defaults</button>
+      </div>
+      <div class="p-pre mt-8" id="cfg-status" style="display:none"></div>
     </div>
 
   </div>
@@ -1875,13 +1904,81 @@ api('/api/info').then(d=>{
   console.info(`[i4z] ${d.name} v${d.version} (${d.implementation}) — ${d.web_url||location.origin}`);
 }).catch(e=>console.warn('[i4z] info failed:', e.message));
 
+// ════════════════════════════════════════════════════════════
+//  Config panel
+// ════════════════════════════════════════════════════════════
+const CFG_DEFAULTS = { sidebar_refresh_ms: 3000, health_check_ms: 8000, alert_events_ms: 7000, ws_reconnect_ms: 1500 };
+let cfg = { ...CFG_DEFAULTS };
+const _ivals = { sidebar: null, health: null, alerts: null };
+
+function startIntervals() {
+  if (_ivals.sidebar) clearInterval(_ivals.sidebar);
+  if (_ivals.health)  clearInterval(_ivals.health);
+  if (_ivals.alerts)  clearInterval(_ivals.alerts);
+  _ivals.sidebar = setInterval(refreshSidebar,  cfg.sidebar_refresh_ms);
+  _ivals.health  = setInterval(loadHealth,      cfg.health_check_ms);
+  _ivals.alerts  = setInterval(loadAlertEvents, cfg.alert_events_ms);
+}
+
+function setCfgInputs(c) {
+  const s=$('cfg-sidebar'); if(s) s.value=c.sidebar_refresh_ms;
+  const h=$('cfg-health');  if(h) h.value=c.health_check_ms;
+  const a=$('cfg-alerts');  if(a) a.value=c.alert_events_ms;
+  const w=$('cfg-wsrecon'); if(w) w.value=c.ws_reconnect_ms;
+}
+
+function loadConfig() {
+  api('/api/config').then(data => {
+    cfg = {
+      sidebar_refresh_ms: Number(data.sidebar_refresh_ms) || CFG_DEFAULTS.sidebar_refresh_ms,
+      health_check_ms:    Number(data.health_check_ms)    || CFG_DEFAULTS.health_check_ms,
+      alert_events_ms:    Number(data.alert_events_ms)    || CFG_DEFAULTS.alert_events_ms,
+      ws_reconnect_ms:    Number(data.ws_reconnect_ms)    || CFG_DEFAULTS.ws_reconnect_ms,
+    };
+    setCfgInputs(cfg);
+    startIntervals();
+  }).catch(() => startIntervals());
+}
+
+function saveConfig() {
+  const body = {
+    sidebar_refresh_ms: parseInt($('cfg-sidebar')?.value) || CFG_DEFAULTS.sidebar_refresh_ms,
+    health_check_ms:    parseInt($('cfg-health')?.value)  || CFG_DEFAULTS.health_check_ms,
+    alert_events_ms:    parseInt($('cfg-alerts')?.value)  || CFG_DEFAULTS.alert_events_ms,
+    ws_reconnect_ms:    parseInt($('cfg-wsrecon')?.value) || CFG_DEFAULTS.ws_reconnect_ms,
+  };
+  api('/api/config', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) })
+    .then(data => {
+      cfg = {
+        sidebar_refresh_ms: Number(data.sidebar_refresh_ms) || CFG_DEFAULTS.sidebar_refresh_ms,
+        health_check_ms:    Number(data.health_check_ms)    || CFG_DEFAULTS.health_check_ms,
+        alert_events_ms:    Number(data.alert_events_ms)    || CFG_DEFAULTS.alert_events_ms,
+        ws_reconnect_ms:    Number(data.ws_reconnect_ms)    || CFG_DEFAULTS.ws_reconnect_ms,
+      };
+      setCfgInputs(cfg);
+      startIntervals();
+      const s=$('cfg-status'); if(s){ s.textContent='Saved.'; s.style.display=''; setTimeout(()=>{ s.style.display='none'; }, 2500); }
+      toast('Config saved & intervals restarted', 'success');
+    })
+    .catch(e => toast('Save failed: '+e.message, 'error'));
+}
+
+$('cfg-save-btn')?.addEventListener('click', saveConfig);
+$('cfg-reset-btn')?.addEventListener('click', () => {
+  api('/api/config', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(CFG_DEFAULTS) })
+    .then(data => {
+      cfg = { ...CFG_DEFAULTS };
+      setCfgInputs(cfg);
+      startIntervals();
+      toast('Config reset to defaults', 'success');
+    })
+    .catch(e => toast('Reset failed: '+e.message, 'error'));
+});
+
 refreshSidebar();
 loadHealth();
 loadWorkspaces();
-
-setInterval(refreshSidebar,  3000);
-setInterval(loadHealth,      8000);
-setInterval(loadAlertEvents, 7000);
+loadConfig();
 </script>
 </body>
 </html>
