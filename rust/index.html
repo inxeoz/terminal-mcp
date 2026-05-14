@@ -810,6 +810,7 @@ body[data-theme="light"] .p-select{
     <span class="infobar-sep">·</span>
     <span id="infobar-size"></span>
     <span class="infobar-spacer"></span>
+    <button class="ib-btn" id="ib-connect-btn" title="Reconnect WebSocket">Connect</button>
     <button class="ib-btn" id="ib-search-btn" title="Search output">Search</button>
     <button class="ib-btn" id="ib-clear-btn" title="Clear screen">Clear</button>
   </div>
@@ -1525,6 +1526,13 @@ $('clear-btn').onclick=()=>{
 // Info bar buttons
 
 $('ib-clear-btn').onclick=()=>{ const s=terms.get(primaryTab||''); if(s?.xterm) s.xterm.clear(); };
+$('ib-connect-btn').onclick=()=>{
+  const s=terms.get(primaryTab||'');
+  if(!s){ toast('No active terminal','warn'); return; }
+  s.reconnect=true;
+  connectWS(s);
+  toast(`Reconnecting "${s.id}"…`,'info',2000);
+};
 $('ib-search-btn').onclick=()=>{
   switchPanel('search');
   if(!isSmallScreen()){
