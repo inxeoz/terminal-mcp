@@ -186,11 +186,24 @@ pub async fn spawn_session(
         env_vars.push(("PROMPT_COMMAND".into(), String::new()));
     }
 
-    let child = pty_process::Command::new("/bin/bash")
-        .args(["--noprofile", "--norc"])
-        .env_clear()
-        .envs(env_vars)
-        .spawn(pts)?;
+    let shell = opts.env.iter()
+        .find(|(k, _)| k == "SHELL")
+        .map(|(_, v)| v.as_str())
+        .unwrap_or("/bin/bash")
+        .to_string();
+    let is_bash = shell.ends_with("bash");
+    let child = if is_bash {
+        pty_process::Command::new(&shell)
+            .args(["--noprofile", "--norc"])
+            .env_clear()
+            .envs(env_vars)
+            .spawn(pts)?
+    } else {
+        pty_process::Command::new(&shell)
+            .env_clear()
+            .envs(env_vars)
+            .spawn(pts)?
+    };
     let pid = child.id().unwrap_or(0);
 
     let resize_fd: RawFd = pty.as_raw_fd();
@@ -320,10 +333,6 @@ async fn pty_task(
             }
 
             Some(data) = write_rx.recv() => {
-                let text = String::from_utf8_lossy(&data).to_string();
-                // Record input to history (strip newline for cleaner storage)
-                let clean_input = text.trim_end_matches(&['\n', '\r'][..]).to_string();
-                let _ = history.record_input(&terminal_id, &clean_input).await;
                 let _ = write_half.write_all(&data).await;
             }
 

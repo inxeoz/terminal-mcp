@@ -135,7 +135,7 @@ impl Manager {
             ("USER".into(), std::env::var("USER").unwrap_or_default()),
             ("PATH".into(), std::env::var("PATH").unwrap_or("/usr/bin:/bin".into())),
             ("LANG".into(), std::env::var("LANG").unwrap_or("en_US.UTF-8".into())),
-            ("SHELL".into(), "/bin/bash".into()),
+            ("SHELL".into(), std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".into())),
         ];
         for (k, v) in &merged_env {
             if let Value::String(s) = v {
@@ -779,7 +779,10 @@ impl Manager {
             if event.get("type").and_then(|t| t.as_str()) == Some("input") {
                 if let Some(text) = event.get("text").and_then(|t| t.as_str()) {
                     self.send(&target_id, text).await?;
-                    tokio::time::sleep(Duration::from_millis(50)).await;
+                    let _ = tokio::time::timeout(
+                        Duration::from_millis(200),
+                        session.output_notify.notified(),
+                    ).await;
                 }
             }
         }

@@ -147,6 +147,26 @@ impl History {
         Ok(Self { pool })
     }
 
+    async fn alter_table_add_column(pool: &SqlitePool, sql: &str) -> Result<()> {
+        if let Err(e) = sqlx::query(sql).execute(pool).await {
+            let msg = e.to_string();
+            if !msg.contains("duplicate column name") && !msg.contains("already exists") {
+                return Err(e.into());
+            }
+        }
+        Ok(())
+    }
+
+    async fn alter_table_rename_column(pool: &SqlitePool, sql: &str) -> Result<()> {
+        if let Err(e) = sqlx::query(sql).execute(pool).await {
+            let msg = e.to_string();
+            if !msg.contains("no such column") && !msg.contains("already exists") {
+                return Err(e.into());
+            }
+        }
+        Ok(())
+    }
+
     async fn migrate(pool: &SqlitePool) -> Result<()> {
         sqlx::query(
             "CREATE TABLE IF NOT EXISTS events (
@@ -175,25 +195,25 @@ impl History {
         .execute(pool)
         .await?;
         // Migrations: rename old schema columns (kind→type, data→text, ts→timestamp)
-        let _ = sqlx::query("ALTER TABLE events RENAME COLUMN kind TO type").execute(pool).await;
-        let _ = sqlx::query("ALTER TABLE events RENAME COLUMN data TO text").execute(pool).await;
-        let _ = sqlx::query("ALTER TABLE events RENAME COLUMN ts TO timestamp").execute(pool).await;
+        Self::alter_table_rename_column(pool, "ALTER TABLE events RENAME COLUMN kind TO type").await?;
+        Self::alter_table_rename_column(pool, "ALTER TABLE events RENAME COLUMN data TO text").await?;
+        Self::alter_table_rename_column(pool, "ALTER TABLE events RENAME COLUMN ts TO timestamp").await?;
         // Migrations: add columns added after initial DB creation
-        let _ = sqlx::query(
+        Self::alter_table_add_column(pool,
             "ALTER TABLE events ADD COLUMN type TEXT NOT NULL DEFAULT 'output'",
-        ).execute(pool).await;
-        let _ = sqlx::query(
+        ).await?;
+        Self::alter_table_add_column(pool,
             "ALTER TABLE events ADD COLUMN text TEXT NOT NULL DEFAULT ''",
-        ).execute(pool).await;
-        let _ = sqlx::query(
+        ).await?;
+        Self::alter_table_add_column(pool,
             "ALTER TABLE events ADD COLUMN timestamp TEXT NOT NULL DEFAULT '1970-01-01T00:00:00Z'",
-        ).execute(pool).await;
-        let _ = sqlx::query(
+        ).await?;
+        Self::alter_table_add_column(pool,
             "ALTER TABLE session_profiles ADD COLUMN startup_json TEXT NOT NULL DEFAULT '[]'",
-        ).execute(pool).await;
-        let _ = sqlx::query(
+        ).await?;
+        Self::alter_table_add_column(pool,
             "ALTER TABLE session_profiles ADD COLUMN updated_at TEXT NOT NULL DEFAULT '1970-01-01T00:00:00Z'",
-        ).execute(pool).await;
+        ).await?;
         sqlx::query(
             "CREATE TABLE IF NOT EXISTS alerts (
                 id TEXT PRIMARY KEY,
@@ -237,9 +257,9 @@ impl History {
         )
         .execute(pool)
         .await?;
-        let _ = sqlx::query(
+        Self::alter_table_add_column(pool,
             "ALTER TABLE reader_errors ADD COLUMN updated_at TEXT NOT NULL DEFAULT '1970-01-01T00:00:00Z'",
-        ).execute(pool).await;
+        ).await?;
         sqlx::query(
             "CREATE TABLE IF NOT EXISTS bookmarks (
                 id TEXT PRIMARY KEY,
@@ -269,15 +289,15 @@ impl History {
         .execute(pool)
         .await?;
         // Migrations: add columns added after initial DB creation
-        let _ = sqlx::query(
+        Self::alter_table_add_column(pool,
             "ALTER TABLE workspaces ADD COLUMN startup_json TEXT NOT NULL DEFAULT '[]'",
-        ).execute(pool).await;
-        let _ = sqlx::query(
+        ).await?;
+        Self::alter_table_add_column(pool,
             "ALTER TABLE workspaces ADD COLUMN updated_at TEXT NOT NULL DEFAULT '1970-01-01T00:00:00Z'",
-        ).execute(pool).await;
-        let _ = sqlx::query(
+        ).await?;
+        Self::alter_table_add_column(pool,
             "ALTER TABLE workspaces ADD COLUMN created_at TEXT NOT NULL DEFAULT '1970-01-01T00:00:00Z'",
-        ).execute(pool).await;
+        ).await?;
         sqlx::query(
             "CREATE TABLE IF NOT EXISTS workspace_members (
                 workspace_id TEXT NOT NULL,

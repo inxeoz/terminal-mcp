@@ -431,18 +431,20 @@ async fn api_import(mgr: Data, body: web::Json<ImportBody>) -> impl Responder {
 
 // ── WebSocket (JSON protocol, matching Python) ────────────────────────────────
 
+#[derive(serde::Deserialize)]
+struct WsParams {
+    since: Option<i64>,
+}
+
 async fn ws_terminal(
     mgr: Data,
     path: web::Path<String>,
+    params: web::Query<WsParams>,
     req: HttpRequest,
     body: web::Payload,
 ) -> actix_web::Result<impl Responder> {
     let id = path.into_inner();
-
-    let since: i64 = req.query_string().split("since=").nth(1)
-        .and_then(|s| s.split('&').next())
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(0);
+    let since = params.since.unwrap_or(0);
 
     let (response, mut ws_session, mut msg_stream) = actix_ws::handle(&req, body)?;
 
