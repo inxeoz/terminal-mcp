@@ -2,6 +2,12 @@
 name = "i4z-terminal-mcp"
 version = "0.2.0"
 edition = "2021"
+description = "Persistent PTY terminal session manager exposed as an MCP server and web UI, backed by SQLite history"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/inxeoz/terminal-mcp"
+readme = "README.md"
+keywords = ["mcp", "terminal", "pty", "shell", "ai"]
+categories = ["command-line-utilities", "development-tools"]
 
 [[bin]]
 name = "i4z-terminal-mcp"
