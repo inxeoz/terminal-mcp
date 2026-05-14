@@ -809,7 +809,6 @@ body[data-theme="light"] .p-select{
     <span class="infobar-sep">·</span>
     <span id="infobar-size"></span>
     <span class="infobar-spacer"></span>
-    <button class="ib-btn danger" id="ib-kill-btn" title="Kill terminal process (keeps history)">Kill</button>
     <button class="ib-btn" id="ib-search-btn" title="Search output">Search</button>
     <button class="ib-btn" id="ib-clear-btn" title="Clear screen">Clear</button>
   </div>
@@ -1245,7 +1244,6 @@ function updateInfoBar(){
     :'<span style="color:var(--danger)">● dead</span>';
   const cols=state.xterm?.cols||'?', rows=state.xterm?.rows||'?';
   $('infobar-size').textContent=`${cols}×${rows}`;
-  $('ib-kill-btn').style.display=state.alive?'':'none';
 }
 
 // ════════════════════════════════════════════════════════════
@@ -1294,15 +1292,11 @@ function renderSidebar(data){
 
     const actions=document.createElement('div'); actions.className='term-actions';
 
-    const killBtn=document.createElement('button');
-    killBtn.className='ta-btn warn'; killBtn.title='Kill process (keeps history)'; killBtn.textContent='⏹';
-    killBtn.onclick=e=>{e.stopPropagation();killTerminal(t.id)};
-
     const delBtn=document.createElement('button');
     delBtn.className='ta-btn danger'; delBtn.title='Delete terminal and all history'; delBtn.textContent='×';
     delBtn.onclick=e=>{e.stopPropagation();confirmDeleteTerminal(t.id,item)};
 
-    actions.append(killBtn,delBtn);
+    actions.append(delBtn);
     item.append(dot,info,actions);
     item.onclick=()=>openTab(t.id);
     item.ondblclick=e=>{e.stopPropagation();startRename(item,t.id)};
@@ -1428,7 +1422,7 @@ $('clear-btn').onclick=()=>{
 };
 
 // Info bar buttons
-$('ib-kill-btn').onclick=()=>{ if(primaryTab) killTerminal(primaryTab); };
+
 $('ib-clear-btn').onclick=()=>{ const s=terms.get(primaryTab||''); if(s?.xterm) s.xterm.clear(); };
 $('ib-search-btn').onclick=()=>{
   switchPanel('search');
