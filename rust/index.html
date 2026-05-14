@@ -227,6 +227,16 @@ body{
   background:var(--surface-2);border:1px solid var(--border-2);
   padding:1px 7px;border-radius:var(--r-xl);
 }
+#sidebar-refresh-btn{
+  background:none;border:none;color:var(--fg-3);cursor:pointer;
+  font-size:13px;line-height:1;padding:2px 4px;border-radius:var(--r-sm);
+  transition:color var(--t1),background var(--t1);flex-shrink:0;
+}
+#sidebar-refresh-btn:hover{color:var(--fg);background:var(--surface-2)}
+#sidebar-refresh-btn.spinning{animation:spin .5s linear}
+@keyframes spin{to{transform:rotate(360deg)}}
+.health-pill{cursor:pointer}
+.health-pill:hover #health-text{color:var(--fg-2)}
 
 #new-term-bar{
   display:flex;gap:0;padding:8px 10px;
@@ -771,6 +781,7 @@ body[data-theme="light"] .p-select{
   </div>
   <span class="hdr-spacer"></span>
   <div class="hdr-actions">
+    <button class="hdr-btn" id="sync-btn" title="Sync all: terminals, health, alerts">↻</button>
     <button class="hdr-btn" id="split-btn" title="Split view">Split</button>
     <button class="hdr-btn" id="notify-btn" title="Browser notifications">Notify</button>
     <button class="hdr-btn active" id="panel-toggle-btn" title="Toggle right panel">Panel</button>
@@ -785,6 +796,7 @@ body[data-theme="light"] .p-select{
   <div id="sidebar-title">
     <span class="stitle">Terminals</span>
     <span id="term-count-badge" style="display:none"></span>
+    <button id="sidebar-refresh-btn" title="Refresh terminal list">↻</button>
   </div>
   <div id="new-term-bar">
     <input id="new-term-name" placeholder="Session name…" maxlength="80" autocomplete="off">
@@ -1539,6 +1551,30 @@ $('ib-search-btn').onclick=()=>{
     if(!panelVisible){ panelVisible=true; document.body.classList.remove('panel-hidden'); $('panel-toggle-btn').classList.add('active'); }
   } else { openRightDrawer(); }
   setTimeout(()=>$('search-query').focus(),100);
+};
+
+// Sidebar refresh button
+function _spinRefresh(btnId, fn){
+  const btn=$(btnId); if(!btn) return;
+  btn.classList.add('spinning');
+  const p=fn(); if(p&&p.finally) p.finally(()=>btn.classList.remove('spinning'));
+  else setTimeout(()=>btn.classList.remove('spinning'),500);
+}
+$('sidebar-refresh-btn').onclick=()=>_spinRefresh('sidebar-refresh-btn', refreshSidebar);
+
+// Health pill — click to refresh health
+$('health-pip').closest?.('.health-pill')?.addEventListener('click', ()=>{
+  loadHealth();
+  toast('Health refreshed','info',1500);
+});
+
+// Sync all button — refreshes terminals + health + alert events + active panel data
+$('sync-btn').onclick=()=>{
+  refreshSidebar(); loadHealth(); loadAlertEvents();
+  if(activePanel==='alerts') loadAlerts();
+  else if(activePanel==='checkpoints') loadCheckpoints();
+  else if(activePanel==='workspace') loadWorkspaces();
+  toast('Synced','info',1500);
 };
 
 // ════════════════════════════════════════════════════════════
