@@ -1029,6 +1029,7 @@ let splitMode  = false;
 let panelVisible = true;
 let activePanel  = 'profile';
 let lastAlertEventId = 0;
+const tabPlaceholder = $('tab-placeholder'); // cached once — survives bar.innerHTML='' clears
 
 function getCmdHistory(id){ try{return JSON.parse(sessionStorage.getItem('h:'+id)||'[]')}catch{return[]} }
 function pushCmdHistory(id, cmd){
@@ -1113,7 +1114,7 @@ function connectWS(state){
   if(state.ws){ try{state.ws.close()}catch{} }
   state.reconnect = true;
   const proto = location.protocol==='https:'?'wss:':'ws:';
-  const ws = new WebSocket(`${proto}//${location.host}/ws/${encodeURIComponent(state.id)}?since=0`);
+  const ws = new WebSocket(`${proto}//${location.host}/ws/${encodeURIComponent(state.id)}?since=${state.cursor}`);
   state.ws = ws;
   ws.onmessage = ev => {
     let msg; try{msg=JSON.parse(ev.data)}catch{return}
@@ -1139,7 +1140,7 @@ function connectWS(state){
     }
   };
   ws.onclose = () => {
-    if(state.reconnect && state.alive) setTimeout(()=>connectWS(state), 1500);
+    if(state.reconnect) setTimeout(()=>connectWS(state), 1500);
     else { updateTabDot(state.id, false); updateSidebarDot(state.id, false); }
   };
   ws.onerror = e => console.warn(`[ws] ${state.id} error`, e);
@@ -1184,9 +1185,9 @@ function closeTab(id){
 }
 
 function renderTabs(){
-  const bar=$('tab-bar'), ph=$('tab-placeholder');
-  if(!terms.size){ bar.innerHTML=''; bar.appendChild(ph); ph.style.display='flex'; return; }
-  ph.style.display='none'; bar.innerHTML='';
+  const bar=$('tab-bar'), ph=tabPlaceholder;
+  if(!terms.size){ bar.innerHTML=''; if(ph){bar.appendChild(ph); ph.style.display='flex';} return; }
+  if(ph) ph.style.display='none'; bar.innerHTML='';
   for(const [id,state] of terms){
     const tab=document.createElement('div');
     tab.className='tab'+(id===primaryTab?' active':''); tab.dataset.id=id;
@@ -1229,10 +1230,9 @@ function updateSidebarDot(id, alive){
 }
 function updateCmdBar(){
   const bar=$('cmd-bar');
-  if(primaryTab && terms.has(primaryTab)){
-    bar.className='visible';
-    $('cmd-input').disabled = !terms.get(primaryTab).alive;
-  } else { bar.className=''; }
+  const active = !!(primaryTab && terms.has(primaryTab));
+  bar.classList.toggle('visible', active);
+  $('cmd-input').disabled = active ? !terms.get(primaryTab).alive : true;
 }
 function updateInfoBar(){
   const bar=$('info-bar');
@@ -1323,10 +1323,10 @@ function confirmDeleteTerminal(id, item){
   const origClick=item.onclick; item.onclick=null;
   item.innerHTML=`
     <span style="flex:1;font-size:11px;color:var(--fg-2)">Delete <b>${esc(id)}</b>?</span>
-    <button class="ta-btn danger" id="_cd-yes">Yes</button>
-    <button class="ta-btn" id="_cd-no">No</button>`;
-  item.querySelector('#_cd-yes').onclick=e=>{e.stopPropagation();deleteTerminal(id)};
-  item.querySelector('#_cd-no').onclick=e=>{e.stopPropagation();item.innerHTML=prev;item.onclick=origClick};
+    <button class="ta-btn danger" data-action="yes">Yes</button>
+    <button class="ta-btn" data-action="no">No</button>`;
+  item.querySelector('[data-action=yes]').onclick=e=>{e.stopPropagation();deleteTerminal(id)};
+  item.querySelector('[data-action=no]').onclick=e=>{e.stopPropagation();item.innerHTML=prev;item.onclick=origClick};
 }
 
 async function deleteTerminal(id){
@@ -1432,8 +1432,9 @@ $('ib-kill-btn').onclick=()=>{ if(primaryTab) killTerminal(primaryTab); };
 $('ib-clear-btn').onclick=()=>{ const s=terms.get(primaryTab||''); if(s?.xterm) s.xterm.clear(); };
 $('ib-search-btn').onclick=()=>{
   switchPanel('search');
-  if(!isSmallScreen()) { }
-  else openRightDrawer();
+  if(!isSmallScreen()){
+    if(!panelVisible){ panelVisible=true; document.body.classList.remove('panel-hidden'); $('panel-toggle-btn').classList.add('active'); }
+  } else { openRightDrawer(); }
   setTimeout(()=>$('search-query').focus(),100);
 };
 
@@ -1444,7 +1445,7 @@ function switchPanel(name){
   activePanel=name;
   document.querySelectorAll('.ptab').forEach(b=>b.classList.toggle('active',b.dataset.panel===name));
   document.querySelectorAll('.panel-section').forEach(s=>s.classList.remove('active'));
-  $('section-'+name).classList.add('active');
+  const sec=$('section-'+name); if(sec) sec.classList.add('active');
   if(name==='profile') loadProfile();
   else if(name==='workspace') loadWorkspaces();
   else if(name==='alerts'){ loadAlerts(); loadAlertEvents(); }
@@ -1681,11 +1682,12 @@ async function runSearch(){
     const d=await api(`/api/search/${encodeURIComponent(primaryTab)}?q=${encodeURIComponent(q)}`);
     const events=d.events||[];
     if(!events.length){ container.innerHTML='<div class="empty-note">No results for "'+esc(q)+'"</div>'; return; }
-    const re=new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'gi');
+    const re=new RegExp('('+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi');
+    const highlight=t=>t.split(re).map((p,i)=>i%2?`<span class="sr-highlight">${esc(p)}</span>`:esc(p)).join('');
     container.innerHTML=events.map(e=>`
       <div class="search-result">
         <div class="sr-meta">#${e.id} · ${esc(e.type)} · ${new Date(e.timestamp||'').toLocaleTimeString()}</div>
-        <div class="sr-text">${esc(e.text||'').replace(new RegExp(esc(q),'gi'),m=>`<span class="sr-highlight">${m}</span>`)}</div>
+        <div class="sr-text">${highlight(e.text||'')}</div>
       </div>`).join('');
     toast(`${events.length} result(s) found`,'info');
   } catch(e){ container.innerHTML='<div class="empty-note" style="color:var(--danger)">Error: '+esc(e.message)+'</div>'; toast(e.message,'error'); }
@@ -1726,7 +1728,7 @@ async function loadHealth(){
     const d=await api('/api/health');
     const ok=d.db?.ok, counts=d.counts||{}, sessions=d.sessions||{};
     const errs=(d.reader_errors||[]).length;
-    const cls = ok&&errs===0 ? ((sessions.stale||[]).length ? 'warn' : 'ok') : 'bad';
+    const cls = ok&&errs===0 ? ((sessions.stale||0) > 0 ? 'warn' : 'ok') : 'bad';
     pip.className = 'health-pip ' + cls;
     txt.textContent=`db:${ok?'ok':'ERR'} · active:${sessions.active||0} · alerts:${counts.alerts||0} · ws:${counts.workspaces||0}`+(errs?` · ⚠${errs} err`:'');
   } catch(e){
