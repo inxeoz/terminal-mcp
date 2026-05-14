@@ -1,7 +1,7 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use sqlx::{sqlite::SqliteConnectOptions, FromRow, SqlitePool};
+use sqlx::{sqlite::SqliteConnectOptions, FromRow, Row, SqlitePool};
 use std::str::FromStr;
 
 lazy_static::lazy_static! {
@@ -147,22 +147,35 @@ impl History {
         Ok(Self { pool })
     }
 
-    async fn alter_table_add_column(pool: &SqlitePool, sql: &str) -> Result<()> {
-        if let Err(e) = sqlx::query(sql).execute(pool).await {
-            let msg = e.to_string();
-            if !msg.contains("duplicate column name") && !msg.contains("already exists") {
-                return Err(e.into());
-            }
+    async fn column_exists(pool: &SqlitePool, table: &str, col: &str) -> bool {
+        sqlx::query(&format!("PRAGMA table_info({table})"))
+            .fetch_all(pool)
+            .await
+            .ok()
+            .is_some_and(|rows| {
+                rows.iter().any(|r| {
+                    r.try_get::<String, _>("name")
+                        .is_ok_and(|n| n == col)
+                })
+            })
+    }
+
+    async fn rename_col_if_needed(pool: &SqlitePool, table: &str, from: &str, to: &str) -> Result<()> {
+        if Self::column_exists(pool, table, from).await
+            && !Self::column_exists(pool, table, to).await
+        {
+            sqlx::query(&format!("ALTER TABLE {table} RENAME COLUMN {from} TO {to}"))
+                .execute(pool)
+                .await?;
         }
         Ok(())
     }
 
-    async fn alter_table_rename_column(pool: &SqlitePool, sql: &str) -> Result<()> {
-        if let Err(e) = sqlx::query(sql).execute(pool).await {
-            let msg = e.to_string();
-            if !msg.contains("no such column") && !msg.contains("already exists") {
-                return Err(e.into());
-            }
+    async fn add_col_if_missing(pool: &SqlitePool, table: &str, col: &str, definition: &str) -> Result<()> {
+        if !Self::column_exists(pool, table, col).await {
+            sqlx::query(&format!("ALTER TABLE {table} ADD COLUMN {col} {definition}"))
+                .execute(pool)
+                .await?;
         }
         Ok(())
     }
@@ -195,25 +208,15 @@ impl History {
         .execute(pool)
         .await?;
         // Migrations: rename old schema columns (kind→type, data→text, ts→timestamp)
-        Self::alter_table_rename_column(pool, "ALTER TABLE events RENAME COLUMN kind TO type").await?;
-        Self::alter_table_rename_column(pool, "ALTER TABLE events RENAME COLUMN data TO text").await?;
-        Self::alter_table_rename_column(pool, "ALTER TABLE events RENAME COLUMN ts TO timestamp").await?;
-        // Migrations: add columns added after initial DB creation
-        Self::alter_table_add_column(pool,
-            "ALTER TABLE events ADD COLUMN type TEXT NOT NULL DEFAULT 'output'",
-        ).await?;
-        Self::alter_table_add_column(pool,
-            "ALTER TABLE events ADD COLUMN text TEXT NOT NULL DEFAULT ''",
-        ).await?;
-        Self::alter_table_add_column(pool,
-            "ALTER TABLE events ADD COLUMN timestamp TEXT NOT NULL DEFAULT '1970-01-01T00:00:00Z'",
-        ).await?;
-        Self::alter_table_add_column(pool,
-            "ALTER TABLE session_profiles ADD COLUMN startup_json TEXT NOT NULL DEFAULT '[]'",
-        ).await?;
-        Self::alter_table_add_column(pool,
-            "ALTER TABLE session_profiles ADD COLUMN updated_at TEXT NOT NULL DEFAULT '1970-01-01T00:00:00Z'",
-        ).await?;
+        Self::rename_col_if_needed(pool, "events", "kind", "type").await?;
+        Self::rename_col_if_needed(pool, "events", "data", "text").await?;
+        Self::rename_col_if_needed(pool, "events", "ts", "timestamp").await?;
+        // Migrations: add columns that may be missing on older DBs
+        Self::add_col_if_missing(pool, "events", "type", "TEXT NOT NULL DEFAULT 'output'").await?;
+        Self::add_col_if_missing(pool, "events", "text", "TEXT NOT NULL DEFAULT ''").await?;
+        Self::add_col_if_missing(pool, "events", "timestamp", "TEXT NOT NULL DEFAULT '1970-01-01T00:00:00Z'").await?;
+        Self::add_col_if_missing(pool, "session_profiles", "startup_json", "TEXT NOT NULL DEFAULT '[]'").await?;
+        Self::add_col_if_missing(pool, "session_profiles", "updated_at", "TEXT NOT NULL DEFAULT '1970-01-01T00:00:00Z'").await?;
         sqlx::query(
             "CREATE TABLE IF NOT EXISTS alerts (
                 id TEXT PRIMARY KEY,
@@ -257,9 +260,7 @@ impl History {
         )
         .execute(pool)
         .await?;
-        Self::alter_table_add_column(pool,
-            "ALTER TABLE reader_errors ADD COLUMN updated_at TEXT NOT NULL DEFAULT '1970-01-01T00:00:00Z'",
-        ).await?;
+        Self::add_col_if_missing(pool, "reader_errors", "updated_at", "TEXT NOT NULL DEFAULT '1970-01-01T00:00:00Z'").await?;
         sqlx::query(
             "CREATE TABLE IF NOT EXISTS bookmarks (
                 id TEXT PRIMARY KEY,
@@ -289,15 +290,9 @@ impl History {
         .execute(pool)
         .await?;
         // Migrations: add columns added after initial DB creation
-        Self::alter_table_add_column(pool,
-            "ALTER TABLE workspaces ADD COLUMN startup_json TEXT NOT NULL DEFAULT '[]'",
-        ).await?;
-        Self::alter_table_add_column(pool,
-            "ALTER TABLE workspaces ADD COLUMN updated_at TEXT NOT NULL DEFAULT '1970-01-01T00:00:00Z'",
-        ).await?;
-        Self::alter_table_add_column(pool,
-            "ALTER TABLE workspaces ADD COLUMN created_at TEXT NOT NULL DEFAULT '1970-01-01T00:00:00Z'",
-        ).await?;
+        Self::add_col_if_missing(pool, "workspaces", "startup_json", "TEXT NOT NULL DEFAULT '[]'").await?;
+        Self::add_col_if_missing(pool, "workspaces", "updated_at", "TEXT NOT NULL DEFAULT '1970-01-01T00:00:00Z'").await?;
+        Self::add_col_if_missing(pool, "workspaces", "created_at", "TEXT NOT NULL DEFAULT '1970-01-01T00:00:00Z'").await?;
         sqlx::query(
             "CREATE TABLE IF NOT EXISTS workspace_members (
                 workspace_id TEXT NOT NULL,
