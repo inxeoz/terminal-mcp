@@ -1059,6 +1059,20 @@ let activePanel  = 'profile';
 let lastAlertEventId = 0;
 const tabPlaceholder = $('tab-placeholder'); // cached once — survives bar.innerHTML='' clears
 
+// ── Interaction cooldown ──────────────────────────────────────────────────────
+// Track the last time the user touched anything so polls back off during interaction.
+let _lastInteract = 0;
+['mousedown','keydown','input','touchstart'].forEach(ev =>
+  document.addEventListener(ev, () => _lastInteract = Date.now(), { capture: true, passive: true })
+);
+function userBusy() {
+  if (Date.now() - _lastInteract < 1500) return true;
+  // A confirm-delete dialog or rename input is open — never stomp those.
+  if (document.querySelector('[data-action="yes"]')) return true;
+  if (document.querySelector('.rename-input')) return true;
+  return false;
+}
+
 function getCmdHistory(id){ try{return JSON.parse(sessionStorage.getItem('h:'+id)||'[]')}catch{return[]} }
 function pushCmdHistory(id, cmd){
   const h = getCmdHistory(id);
@@ -1212,23 +1226,42 @@ function closeTab(id){
   renderTabs(); showPanes(); updateCmdBar(); updateInfoBar();
 }
 
+function _buildTab(id, state){
+  const tab=document.createElement('div');
+  tab.className='tab'+(id===primaryTab?' active':''); tab.dataset.id=id;
+  const dot=document.createElement('span');
+  dot.className='tab-dot'+(state.alive?'':' off'); dot.dataset.dot=id;
+  const label=document.createElement('span'); label.textContent=id;
+  const close=document.createElement('button');
+  close.className='tab-close'; close.title='Close tab'; close.textContent='×';
+  close.onclick=e=>{e.stopPropagation();closeTab(id)};
+  tab.append(dot,label,close);
+  tab.onclick=()=>openTab(id);
+  return tab;
+}
 function renderTabs(){
   const bar=$('tab-bar'), ph=tabPlaceholder;
-  if(!terms.size){ bar.innerHTML=''; if(ph){bar.appendChild(ph); ph.style.display='flex';} return; }
-  if(ph) ph.style.display='none'; bar.innerHTML='';
-  for(const [id,state] of terms){
-    const tab=document.createElement('div');
-    tab.className='tab'+(id===primaryTab?' active':''); tab.dataset.id=id;
-    const dot=document.createElement('span');
-    dot.className='tab-dot'+(state.alive?'':' off'); dot.dataset.dot=id;
-    const label=document.createElement('span'); label.textContent=id;
-    const close=document.createElement('button');
-    close.className='tab-close'; close.title='Close tab'; close.textContent='×';
-    close.onclick=e=>{e.stopPropagation();closeTab(id)};
-    tab.append(dot,label,close);
-    tab.onclick=()=>openTab(id);
-    bar.appendChild(tab);
+  if(!terms.size){
+    for(const el of [...bar.querySelectorAll('.tab')]) el.remove();
+    if(ph){ bar.appendChild(ph); ph.style.display='flex'; }
+    return;
   }
+  if(ph) ph.style.display='none';
+  const existing=new Map([...bar.querySelectorAll('.tab[data-id]')].map(el=>[el.dataset.id,el]));
+  for(const [id,state] of terms){
+    let tab=existing.get(id);
+    if(!tab){
+      tab=_buildTab(id,state);
+      ph&&ph.parentNode===bar ? bar.insertBefore(tab,ph) : bar.appendChild(tab);
+    } else {
+      const wc='tab'+(id===primaryTab?' active':'');
+      if(tab.className!==wc) tab.className=wc;
+      const dot=tab.querySelector('.tab-dot');
+      if(dot){ const wd='tab-dot'+(state.alive?'':' off'); if(dot.className!==wd) dot.className=wd; }
+      existing.delete(id);
+    }
+  }
+  for(const [,el] of existing) el.remove();
 }
 
 function showPanes(){
@@ -1281,55 +1314,94 @@ function updateInfoBar(){
 let allTerminals=[];
 
 async function refreshSidebar(){
+  if(userBusy()) return; // back off while user is interacting
   try{
     const data = await api('/api/terminals');
     allTerminals = data;
     const badge=$('term-count-badge');
     badge.textContent = data.length ? data.length : '';
     badge.style.display = data.length ? '' : 'none';
-    for(const t of data){
-      const state=terms.get(t.id);
-      if(state) updateSidebarDot(t.id, state.alive);
-    }
     renderSidebar(data);
   } catch(e){ console.error('[sidebar] refresh failed:', e.message); }
 }
 
+// Build a fresh sidebar item DOM node.
+function _buildSidebarItem(id, alive, isActive, inTab){
+  const item=document.createElement('div');
+  item.className='term-item'+(isActive?' active':inTab?' in-tab':'');
+  item.dataset.id=id;
+  const dot=document.createElement('span');
+  dot.className='sdot '+(alive==null?'unknown':alive?'on':'off');
+  dot.dataset.dot=id; dot.title=alive?'Running':'Stopped';
+  const info=document.createElement('div'); info.className='term-info';
+  const label=document.createElement('div'); label.className='term-label'; label.textContent=id;
+  info.appendChild(label);
+  const actions=document.createElement('div'); actions.className='term-actions';
+  const delBtn=document.createElement('button');
+  delBtn.className='ta-btn danger'; delBtn.title='Delete terminal and all history'; delBtn.textContent='×';
+  delBtn.onclick=e=>{e.stopPropagation();confirmDeleteTerminal(id,item)};
+  actions.append(delBtn);
+  item.append(dot,info,actions);
+  item.onclick=()=>openTab(id);
+  item.ondblclick=e=>{e.stopPropagation();startRename(item,id)};
+  return item;
+}
+
+// Patch only the parts of an existing sidebar item that may have changed.
+// Never touches .term-info so rename inputs survive.
+function _patchSidebarItem(item, id, alive, isActive, inTab){
+  if(item.querySelector('[data-action],[data-action="yes"],.rename-input')) return; // interaction in progress
+  const wc='term-item'+(isActive?' active':inTab?' in-tab':'');
+  if(item.className!==wc) item.className=wc;
+  const dot=item.querySelector('.sdot');
+  if(dot){
+    const wd='sdot '+(alive==null?'unknown':alive?'on':'off');
+    if(dot.className!==wd){ dot.className=wd; dot.title=alive?'Running':'Stopped'; }
+  }
+}
+
+// Diff-patch sidebar: only add/remove/update what changed. Never full-wipe.
 function renderSidebar(data){
   const list=$('term-list');
   if(!data.length){
-    list.innerHTML='<div style="color:var(--fg-4);padding:18px 12px;font-size:12px;text-align:center;line-height:1.6">No terminals yet.<br>Type a name above.</div>';
+    for(const el of [...list.querySelectorAll('.term-item')]) el.remove();
+    if(!list.querySelector('[data-empty]')){
+      const d=document.createElement('div'); d.dataset.empty='1';
+      d.style.cssText='color:var(--fg-4);padding:18px 12px;font-size:12px;text-align:center;line-height:1.6';
+      d.innerHTML='No terminals yet.<br>Type a name above.';
+      list.appendChild(d);
+    }
     return;
   }
-  list.innerHTML='';
+  list.querySelector('[data-empty]')?.remove();
+
+  // Snapshot existing DOM items
+  const existing=new Map([...list.querySelectorAll('.term-item[data-id]')].map(el=>[el.dataset.id,el]));
+  const inData=new Set(data.map(t=>t.id));
+
+  // Walk in server order, maintaining DOM order
+  let prevEl=null;
   for(const t of data){
     const state=terms.get(t.id);
     const alive=state?state.alive:t.alive;
     const isActive=primaryTab===t.id, inTab=terms.has(t.id);
-    const item=document.createElement('div');
-    item.className='term-item'+(isActive?' active':inTab?' in-tab':'');
-    item.dataset.id=t.id;
+    let item=existing.get(t.id);
+    if(!item){
+      item=_buildSidebarItem(t.id,alive,isActive,inTab);
+      if(prevEl) prevEl.after(item); else list.prepend(item);
+    } else {
+      _patchSidebarItem(item,t.id,alive,isActive,inTab);
+      // Maintain order: move item to the right position if needed
+      const expected=prevEl?prevEl.nextElementSibling:list.firstElementChild;
+      if(item!==expected){ if(prevEl) prevEl.after(item); else list.prepend(item); }
+      existing.delete(t.id);
+    }
+    prevEl=item;
+  }
 
-    const dot=document.createElement('span');
-    dot.className='sdot '+(alive==null?'unknown':alive?'on':'off');
-    dot.dataset.dot=t.id;
-    dot.title=alive?'Running':'Stopped';
-
-    const info=document.createElement('div'); info.className='term-info';
-    const label=document.createElement('div'); label.className='term-label'; label.textContent=t.id;
-    info.appendChild(label);
-
-    const actions=document.createElement('div'); actions.className='term-actions';
-
-    const delBtn=document.createElement('button');
-    delBtn.className='ta-btn danger'; delBtn.title='Delete terminal and all history'; delBtn.textContent='×';
-    delBtn.onclick=e=>{e.stopPropagation();confirmDeleteTerminal(t.id,item)};
-
-    actions.append(delBtn);
-    item.append(dot,info,actions);
-    item.onclick=()=>openTab(t.id);
-    item.ondblclick=e=>{e.stopPropagation();startRename(item,t.id)};
-    list.appendChild(item);
+  // Remove items that disappeared from the server list (skip active confirm/rename)
+  for(const [,el] of existing){
+    if(!inData.has(el.dataset.id) && !el.querySelector('[data-action],.rename-input')) el.remove();
   }
 }
 
