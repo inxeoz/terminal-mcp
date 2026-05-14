@@ -180,6 +180,80 @@ impl History {
         Ok(())
     }
 
+    /// Recreate `events` when old `kind` column coexists with new `type` column.
+    /// SQLite cannot ALTER COLUMN constraints, so we copy-drop-rename.
+    async fn repair_events_table(pool: &SqlitePool) -> Result<()> {
+        if !Self::column_exists(pool, "events", "kind").await {
+            return Ok(());
+        }
+        let mut tx = pool.begin().await?;
+        sqlx::query("DROP TABLE IF EXISTS events_new").execute(&mut *tx).await?;
+        sqlx::query(
+            "CREATE TABLE events_new (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                terminal_id TEXT NOT NULL,
+                type TEXT NOT NULL CHECK(type IN ('input','output')),
+                text TEXT NOT NULL,
+                timestamp TEXT NOT NULL
+            )",
+        ).execute(&mut *tx).await?;
+        // `kind` exists alongside `type`; `timestamp` may be INTEGER (old ts column renamed)
+        sqlx::query(
+            "INSERT INTO events_new (id, terminal_id, type, text, timestamp)
+            SELECT id, terminal_id,
+                   COALESCE(type, kind, 'output'),
+                   COALESCE(text, ''),
+                   CASE WHEN typeof(timestamp) = 'integer'
+                        THEN datetime(timestamp, 'unixepoch')
+                        ELSE CAST(timestamp AS TEXT)
+                   END
+            FROM events",
+        ).execute(&mut *tx).await?;
+        sqlx::query("DROP TABLE events").execute(&mut *tx).await?;
+        sqlx::query("ALTER TABLE events_new RENAME TO events").execute(&mut *tx).await?;
+        tx.commit().await?;
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_events_terminal ON events(terminal_id, id)")
+            .execute(pool).await?;
+        Ok(())
+    }
+
+    /// Recreate `alert_events` when the table still has the old schema
+    /// (`matched`, `ts`) instead of the new one (`pattern`, `matched_text`, `timestamp`).
+    async fn repair_alert_events_table(pool: &SqlitePool) -> Result<()> {
+        if !Self::column_exists(pool, "alert_events", "ts").await {
+            return Ok(());
+        }
+        let mut tx = pool.begin().await?;
+        sqlx::query("DROP TABLE IF EXISTS alert_events_new").execute(&mut *tx).await?;
+        sqlx::query(
+            "CREATE TABLE alert_events_new (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                alert_id TEXT NOT NULL,
+                terminal_id TEXT NOT NULL,
+                pattern TEXT NOT NULL,
+                matched_text TEXT NOT NULL,
+                timestamp TEXT NOT NULL
+            )",
+        ).execute(&mut *tx).await?;
+        // Old schema: alert_id INTEGER, terminal_id, matched TEXT, ts INTEGER
+        sqlx::query(
+            "INSERT INTO alert_events_new (id, alert_id, terminal_id, pattern, matched_text, timestamp)
+            SELECT id,
+                   CAST(alert_id AS TEXT),
+                   terminal_id,
+                   '',
+                   COALESCE(matched, ''),
+                   datetime(ts, 'unixepoch')
+            FROM alert_events",
+        ).execute(&mut *tx).await?;
+        sqlx::query("DROP TABLE alert_events").execute(&mut *tx).await?;
+        sqlx::query("ALTER TABLE alert_events_new RENAME TO alert_events").execute(&mut *tx).await?;
+        tx.commit().await?;
+        sqlx::query("CREATE INDEX IF NOT EXISTS idx_alert_events_terminal ON alert_events(terminal_id, id)")
+            .execute(pool).await?;
+        Ok(())
+    }
+
     async fn migrate(pool: &SqlitePool) -> Result<()> {
         sqlx::query(
             "CREATE TABLE IF NOT EXISTS events (
@@ -308,6 +382,9 @@ impl History {
         )
         .execute(pool)
         .await?;
+        // Repair tables that ended up with mixed old+new columns due to partial prior migrations
+        Self::repair_events_table(pool).await?;
+        Self::repair_alert_events_table(pool).await?;
         Ok(())
     }
 
