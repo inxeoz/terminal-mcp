@@ -201,26 +201,27 @@ impl Manager {
     }
 
     pub async fn list_all(&self) -> Vec<serde_json::Value> {
-        let mut active: HashMap<String, serde_json::Value> = HashMap::new();
+        // Collect active sessions into a lookup map.
+        let mut active: HashMap<String, bool> = HashMap::new();
         for r in self.sessions.iter() {
             let s = r.value();
-            active.insert(s.id.clone(), serde_json::json!({
-                "id": s.id,
-                "alive": s.is_alive(),
-            }));
+            active.insert(s.id.clone(), s.is_alive());
         }
-        // Include dead terminals from history
-        if let Ok(ids) = self.history.list_terminal_ids().await {
-            for tid in ids {
-                if !active.contains_key(&tid) {
-                    active.insert(tid.clone(), serde_json::json!({
-                        "id": tid,
-                        "alive": false,
-                    }));
-                }
-            }
+
+        // Start with history order (creation order) so the sidebar is stable.
+        let mut result: Vec<serde_json::Value> = Vec::new();
+        let ordered_ids = self.history.list_terminal_ids().await.unwrap_or_default();
+        for tid in &ordered_ids {
+            let alive = active.remove(tid).unwrap_or(false);
+            result.push(serde_json::json!({ "id": tid, "alive": alive }));
         }
-        active.into_values().collect()
+        // Append any active sessions not yet recorded in history (brand-new).
+        let mut extra: Vec<_> = active.into_iter().collect();
+        extra.sort_by(|a, b| a.0.cmp(&b.0));
+        for (tid, alive) in extra {
+            result.push(serde_json::json!({ "id": tid, "alive": alive }));
+        }
+        result
     }
 
     pub async fn status(&self, id: &str) -> anyhow::Result<serde_json::Value> {

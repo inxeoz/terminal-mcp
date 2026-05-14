@@ -532,16 +532,26 @@ impl History {
     }
 
     pub async fn list_terminal_ids(&self) -> Result<Vec<String>> {
+        // Order by first recorded event timestamp so sidebar preserves creation order.
+        // Terminals without any events yet fall back to alphabetical after the rest.
         let rows: Vec<(String,)> = sqlx::query_as(
-            "SELECT terminal_id FROM (
-                SELECT DISTINCT terminal_id FROM events
+            "SELECT tid FROM (
+                -- sessions that have at least one event: ordered by first event
+                SELECT terminal_id AS tid, MIN(timestamp) AS first_seen
+                FROM events
+                GROUP BY terminal_id
                 UNION
-                SELECT terminal_id FROM session_profiles
-                UNION
-                SELECT terminal_id FROM alerts WHERE terminal_id IS NOT NULL
-                UNION
-                SELECT terminal_id FROM reader_errors
-            ) ORDER BY terminal_id",
+                -- sessions known only via profiles or alerts, no events recorded yet
+                SELECT terminal_id AS tid, '9999-99-99T00:00:00Z' AS first_seen
+                FROM (
+                    SELECT terminal_id FROM session_profiles
+                    UNION
+                    SELECT terminal_id FROM alerts WHERE terminal_id IS NOT NULL
+                    UNION
+                    SELECT terminal_id FROM reader_errors
+                )
+                WHERE terminal_id NOT IN (SELECT DISTINCT terminal_id FROM events)
+            ) ORDER BY first_seen ASC, tid ASC",
         )
         .fetch_all(&self.pool)
         .await?;
