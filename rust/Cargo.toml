@@ -1,6 +1,6 @@
 [package]
 name = "i4z-terminal-mcp"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 description = "Persistent PTY terminal session manager exposed as an MCP server and web UI, backed by SQLite history"
 license = "MIT OR Apache-2.0"
