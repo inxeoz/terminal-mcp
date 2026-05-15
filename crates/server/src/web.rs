@@ -638,7 +638,7 @@ pub async fn run(manager: Arc<Manager>, host: &str, port: u16) -> std::io::Resul
         eprintln!("  Frontend: egui WASM (trunk build)");
     } else {
         eprintln!("  Frontend: embedded HTML (no egui WASM found)");
-        eprintln!("  → Build with: cd frontend && trunk build --release");
+        eprintln!("  → Build with: make frontend");
     }
 
     HttpServer::new(move || {

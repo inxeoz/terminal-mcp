@@ -157,12 +157,12 @@ impl TerminalApp {
     }
 
     fn host_url() -> String {
-        let loc = web_sys::window().and_then(|w| w.location()).unwrap();
+        let loc = web_sys::window().unwrap().location();
         format!("{}//{}", loc.protocol().unwrap(), loc.host().unwrap())
     }
 
     fn ws_protocol() -> &'static str {
-        let loc = web_sys::window().and_then(|w| w.location()).unwrap();
+        let loc = web_sys::window().unwrap().location();
         if loc.protocol().unwrap_or_default() == "https:" {
             "wss:"
         } else {
@@ -252,7 +252,7 @@ impl TerminalApp {
 
     fn connect_ws(state: Rc<RefCell<AppState>>, terminal_id: &str) -> web_sys::WebSocket {
         let host = {
-            let loc = web_sys::window().and_then(|w| w.location()).unwrap();
+            let loc = web_sys::window().unwrap().location();
             loc.host().unwrap()
         };
         let url = format!("{}//{host}/ws/{terminal_id}", Self::ws_protocol());
@@ -274,7 +274,7 @@ impl TerminalApp {
 
         let s = state.clone();
         let onmsg = Closure::wrap(Box::new(move |e: web_sys::MessageEvent| {
-            let text = e.data().dyn_into::<js_sys::JsString>().ok().map(|s| s.into());
+            let text = e.data().dyn_into::<js_sys::JsString>().ok().and_then(|s| s.as_string());
             if let Some(json_str) = text {
                 if let Ok(msg) = serde_json::from_str::<WsMsg>(&json_str) {
                     match msg.msg_type.as_str() {
@@ -354,7 +354,7 @@ impl eframe::App for TerminalApp {
         TopBottomPanel::top("header")
             .frame(Frame {
                 fill: Color32::from_rgb(20, 18, 16),
-                inner_margin: Margin::symmetric(16.0, 8.0),
+                inner_margin: Margin::symmetric(16, 8),
                 ..Default::default()
             })
             .show(ctx, |ui| {
@@ -397,7 +397,7 @@ impl eframe::App for TerminalApp {
             .default_width(220.0)
             .frame(Frame {
                 fill: Color32::from_rgb(20, 18, 16),
-                inner_margin: Margin::symmetric(8.0, 8.0),
+                inner_margin: Margin::symmetric(8, 8),
                 ..Default::default()
             })
             .show(ctx, |ui| {
@@ -421,8 +421,10 @@ impl eframe::App for TerminalApp {
 
                     // Terminal list
                     let state = self.state.borrow();
-                    let mut selected = state.selected_id.clone();
+                    let selected = state.selected_id.clone();
                     let terminals = state.terminals.clone();
+                    let mut clicked_id: Option<String> = None;
+                    let state_rc = self.state.clone();
                     drop(state);
 
                     ScrollArea::vertical()
@@ -440,51 +442,47 @@ impl eframe::App for TerminalApp {
                                 } else {
                                     Color32::from_rgb(102, 96, 90)
                                 };
-                                let response = ui
-                                    .add(
-                                        egui::SelectableLabel::new(
-                                            is_selected,
-                                            egui::RichText::new(&label).color(color).size(13.0),
-                                        )
-                                        .min_size(Vec2::new(ui.available_width(), 24.0)),
-                                    );
+                                let response = ui.add_sized(
+                                    Vec2::new(ui.available_width(), 24.0),
+                                    egui::SelectableLabel::new(
+                                        is_selected,
+                                        egui::RichText::new(&label).color(color).size(13.0),
+                                    ),
+                                );
                                 if response.clicked() {
-                                    drop(ui);
-                                    let mut state = self.state.borrow_mut();
-                                    state.selected_id = Some(t.id.clone());
-                                    state.output_lines.clear();
-                                    state.terminal_status = None;
-                                    let new_id = t.id.clone();
-                                    drop(state);
-
-                                    // Close old WS, open new
-                                    if let Some(old_ws) = self.ws.borrow_mut().take() {
-                                        let _ = old_ws.close();
-                                    }
-                                    let state = self.state.clone();
-                                    let ws = Self::connect_ws(state, &new_id);
-                                    *self.ws.borrow_mut() = Some(ws);
+                                    clicked_id = Some(t.id.clone());
                                 }
                                 // Right-click context menu
-                                response.context_menu(|ui| {
-                                    let id = t.id.clone();
+                                let id = t.id.clone();
+                                let s = state_rc.clone();
+                                response.context_menu(move |ui| {
                                     if ui.button("Kill").clicked() {
-                                        Self::kill_terminal(self.state.clone(), &id);
+                                        Self::kill_terminal(s.clone(), &id);
                                         ui.close_menu();
                                     }
                                     if ui.button("Delete").clicked() {
-                                        Self::delete_terminal(self.state.clone(), &id);
-                                        // Close WS if this was selected
-                                        if self.state.borrow().selected_id.as_deref() == Some(&id) {
-                                            if let Some(ws) = self.ws.borrow_mut().take() {
-                                                let _ = ws.close();
-                                            }
-                                        }
+                                        Self::delete_terminal(s.clone(), &id);
                                         ui.close_menu();
                                     }
                                 });
                             }
                         });
+
+                    // Handle selection outside the closure (avoids drop(ui))
+                    if let Some(id) = clicked_id {
+                        let mut state = self.state.borrow_mut();
+                        state.selected_id = Some(id.clone());
+                        state.output_lines.clear();
+                        state.terminal_status = None;
+                        drop(state);
+
+                        if let Some(old_ws) = self.ws.borrow_mut().take() {
+                            let _ = old_ws.close();
+                        }
+                        let state = self.state.clone();
+                        let ws = Self::connect_ws(state, &id);
+                        *self.ws.borrow_mut() = Some(ws);
+                    }
                 });
             });
 
@@ -492,7 +490,7 @@ impl eframe::App for TerminalApp {
         CentralPanel::default()
             .frame(Frame {
                 fill: Color32::from_rgb(12, 11, 9),
-                inner_margin: Margin::symmetric(12.0, 8.0),
+                inner_margin: Margin::symmetric(12, 8),
                 ..Default::default()
             })
             .show(ctx, |ui| {
@@ -551,7 +549,7 @@ impl eframe::App for TerminalApp {
 
                 let num_lines = output_lines.len();
                 ScrollArea::vertical()
-                    .id_source("terminal_output")
+                    .id_salt("terminal_output")
                     .auto_shrink([false; 2])
                     .stick_to_bottom(true)
                     .show(ui, |ui| {
@@ -611,7 +609,7 @@ impl eframe::App for TerminalApp {
             });
 
         // ── New terminal dialog ────────────────────────────────────────
-        let mut show = self.state.borrow().show_new_dialog;
+        let show = self.state.borrow().show_new_dialog;
         if show {
             let state = self.state.clone();
             egui::Window::new("New Terminal")
@@ -620,7 +618,7 @@ impl eframe::App for TerminalApp {
                 .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
                 .frame(Frame {
                     fill: Color32::from_rgb(27, 25, 22),
-                    inner_margin: Margin::symmetric(20.0, 16.0),
+                    inner_margin: Margin::symmetric(20, 16),
                     ..Default::default()
                 })
                 .show(ctx, |ui| {
@@ -699,22 +697,26 @@ fn setup_style(ctx: &egui::Context) {
 fn main() {
     eframe::WebLogger::init(log::LevelFilter::Debug).ok();
 
-    let web_options = eframe::WebOptions {
-        follow_system_theme: false,
-        ..Default::default()
-    };
+    let web_options = eframe::WebOptions::default();
 
     wasm_bindgen_futures::spawn_local(async {
         let app = TerminalApp::new();
         let state = app.state.clone();
         TerminalApp::fetch_terminals(state);
 
-        eframe::start_web(
-            "the_canvas_id",
-            web_options,
-            Box::new(|_cc| Ok(Box::new(app))),
-        )
-        .await
-        .expect("failed to start eframe");
+        let canvas = web_sys::window()
+            .and_then(|w| w.document())
+            .and_then(|d| d.get_element_by_id("the_canvas_id"))
+            .and_then(|e| e.dyn_into::<web_sys::HtmlCanvasElement>().ok())
+            .expect("canvas #the_canvas_id not found");
+
+        eframe::WebRunner::new()
+            .start(
+                canvas,
+                web_options,
+                Box::new(|_cc| Ok(Box::new(app))),
+            )
+            .await
+            .expect("failed to start eframe");
     });
 }

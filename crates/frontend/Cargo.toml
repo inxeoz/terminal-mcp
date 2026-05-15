@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-eframe = { version = "0.31", default-features = false, features = ["default_fonts", "web_screen_reader"] }
+eframe = { version = "0.31", default-features = false, features = ["default_fonts", "web_screen_reader", "glow"] }
 egui = "0.31"
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
