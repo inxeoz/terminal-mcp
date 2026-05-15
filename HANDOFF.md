@@ -33,28 +33,22 @@ An MCP (Model Context Protocol) server that gives AI agents real persistent PTY 
 
 ```
 .
-├── rust/                   ← Production implementation (Rust)
-│   ├── src/
-│   │   ├── main.rs         ← Entry point, port/state-dir config
-│   │   ├── manager.rs      ← Terminal lifecycle, all business logic
-│   │   ├── session.rs      ← PTY session (pty-process + tokio reader task)
-│   │   ├── history.rs      ← SQLite persistence (sqlx async), migrations
-│   │   ├── tools.rs        ← MCP tool definitions (rmcp proc-macro #[tool])
-│   │   ├── web.rs          ← actix-web HTTP API + actix-ws WebSocket
-│   │   └── error.rs        ← Unified Error type
-│   ├── index.html          ← Entire frontend (single file, embedded at compile time)
-│   └── Cargo.toml
-├── python/                 ← Reference implementation (Python)
-│   └── terminal/
-│       ├── server.py       ← MCP + web server entrypoint
-│       ├── manager.py      ← SessionManager
-│       ├── history.py      ← SQLite via sqlite3 (sync)
-│       ├── tools.py        ← MCP tool definitions
-│       ├── session.py      ← pexpect PTY session
-│       └── web.py          ← Starlette HTTP + WebSocket + embedded HTML
-├── test.mjs                ← Playwright integration tests (9 tests)
-├── spec.md                 ← Full protocol/architecture spec
-└── Makefile                ← All build/run/test targets
+├── crates/                   ← Rust crates
+│   ├── server/               ← MCP server (main, manager, session, history, web, tools)
+│   │   ├── src/              ← Source files
+│   │   ├── tests/
+│   │   ├── migrations/
+│   │   └── index.html        ← HTML frontend fallback
+│   │
+│   └── frontend/             ← egui WASM UI (trunk build)
+│       ├── src/main.rs
+│       └── index.html
+│
+├── Cargo.toml                ← Workspace root
+├── Makefile                  ← Build/run/test targets
+├── spec.md                   ← Full protocol/architecture spec
+├── test.mjs                  ← Web integration tests
+└── .gitignore
 ```
 
 ---
@@ -66,9 +60,6 @@ An MCP (Model Context Protocol) server that gives AI agents real persistent PTY 
 make rs-run-release
 # Default web port: random free port, printed on startup
 # Override: I4Z_TERMINAL_WEB_PORT=9020 make rs-run-release
-
-# Python (reference) — web-only dev mode (no MCP)
-make py-run-dev          # port 9020
 
 # Install Rust binary globally → ~/.local/bin/
 make rs-install-global
@@ -229,10 +220,8 @@ WS     /ws/{id}?since=N             → WebSocket stream
 ## Possible next work
 
 - [ ] Add auth (API key via env var) for network deployment
-- [ ] Sync Python frontend with new Rust UI (`python/terminal/web.py`)
 - [ ] Terminal search highlight: currently regex escaping in frontend is naive (escapes the query before building the highlight regex — needs fixing for real regex searches)
 - [ ] Proper schema versioning (`schema_version` table) instead of `ALTER TABLE` accumulation
-- [ ] Python Playwright test suite parity
 - [ ] `wait_for_output` fast-fail when terminal dies
 - [ ] Export/import via UI file picker (currently paste-JSON only)
 - [ ] Workspace membership shown on sidebar terminal items

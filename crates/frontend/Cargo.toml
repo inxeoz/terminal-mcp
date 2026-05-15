@@ -1,0 +1,16 @@
+[package]
+name = "i4z-terminal-ui"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+eframe = { version = "0.31", default-features = false, features = ["default_fonts", "web_screen_reader"] }
+egui = "0.31"
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+web-sys = { version = "0.3", features = ["WebSocket", "MessageEvent", "Window", "Location", "console"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+gloo-net = "0.6"
+log = "0.4"

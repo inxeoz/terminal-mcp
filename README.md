@@ -55,17 +55,10 @@ Most AI agents run shell commands by spawning a fresh subprocess per call. That 
 
 ```
 i4z-terminal-mcp/
-├── python/              # Python reference implementation
-│   ├── terminal/        # Source: server, manager, history, session, web, etc.
-│   ├── pyproject.toml
-│   ├── README.md        # Python-specific docs + mermaid diagrams
-│   └── demo.py
-├── rust/                # Rust high-performance port
-│   ├── src/             # Source: main, tools, manager, history, session, web
-│   ├── Cargo.toml
-│   ├── README.md        # Rust-specific docs + mermaid diagrams
-│   └── index.html
-├── Makefile             # Unified build/run/test targets
+├── Cargo.toml           # Cargo workspace root
+├── crates/
+│   └── server/          # Server: main, tools, manager, history, session, web
+├── Makefile             # Build/run/test targets
 ├── README.md            # This file
 └── spec.md              # Full specification
 ```
@@ -73,11 +66,11 @@ i4z-terminal-mcp/
 ## Quick Start
 
 ```bash
-# Python
-make install && make run
+# Build & run (Rust)
+make rs-run
 
-# Rust
-make build && make run-rust
+# Release build & run
+make rs-run-release
 
 # Test & benchmark
 make test

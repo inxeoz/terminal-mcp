@@ -72,46 +72,42 @@ i4z-terminal-mcp is an MCP (Model Context Protocol) server that provides AI agen
 
 ```
 i4z-terminal-mcp/
-├── python/                    # Python reference implementation
-│   ├── terminal/
-│   │   ├── __init__.py
-│   │   ├── server.py          # MCP server entry point, CLI main()
-│   │   ├── tools.py           # MCP tool definitions (JSON Schema)
-│   │   ├── manager.py         # SessionManager: lifecycle, profiles, alerts, exports
-│   │   ├── history.py         # HistoryStore: SQLite (8 tables, sync)
-│   │   ├── session.py         # TerminalSession: PTY wrapper, output buffer, cursor
-│   │   ├── reader.py          # Background asyncio reader loop (50ms poll)
-│   │   ├── signals.py         # SIGINT/SIGTERM/SIGKILL dispatch
-│   │   ├── web.py             # Starlette web server, HTML UI, REST + WS
-│   │   └── log.py             # Structured stderr logger
-│   ├── pyproject.toml         # Package metadata, hatchling build
-│   ├── requirements.txt
-│   ├── demo.py                # MCP client integration demo
-│   └── README.md              # Python-specific docs + mermaid diagrams
+├── Cargo.toml                 # Cargo workspace root
+├── Cargo.lock
+├── Makefile                   # Build/run/test targets
+├── README.md                  # Project overview
+├── spec.md                    # This file
+├── HANDOFF.md
 │
-├── rust/                      # Rust production port
-│   ├── src/
-│   │   ├── main.rs            # Entry point: web + MCP + signal handling
-│   │   ├── lib.rs             # Module exports
-│   │   ├── tools.rs           # 34 MCP tools via rmcp proc-macro
-│   │   ├── manager.rs         # Manager: session lifecycle, I/O, alerts, workspaces
-│   │   ├── history.rs         # History: SQLx async SQLite
-│   │   ├── session.rs         # Session: PTY wrapper, bounded deque buffer, CWD
-│   │   ├── web.rs             # actix-web server: 25 REST + WS + HTML UI
-│   │   ├── error.rs           # Error types
-│   │   └── bin/
-│   │       ├── bench.rs       # Performance benchmark
-│   │       └── stress.rs      # Stress test (20 concurrent sessions)
-│   ├── tests/
-│   │   └── parity.rs          # Python vs Rust API parity tests
-│   ├── index.html             # xterm.js frontend (included at compile)
-│   ├── migrations/            # SQL migration files
-│   ├── Cargo.toml
-│   └── README.md              # Rust-specific docs + mermaid diagrams
+├── crates/
+│   ├── server/                # Rust MCP server
+│   │   ├── Cargo.toml
+│   │   ├── src/
+│   │   │   ├── main.rs        # Entry point: web + MCP + signal handling
+│   │   │   ├── lib.rs         # Module exports
+│   │   │   ├── tools.rs       # 34 MCP tools via rmcp proc-macro
+│   │   │   ├── manager.rs     # Manager: session lifecycle, I/O, alerts, workspaces
+│   │   │   ├── history.rs     # History: SQLx async SQLite
+│   │   │   ├── session.rs     # Session: PTY wrapper, bounded deque buffer, CWD
+│   │   │   ├── web.rs         # actix-web server: 25 REST + WS + HTML/egui UI
+│   │   │   ├── error.rs       # Error types
+│   │   │   └── bin/
+│   │   │       ├── bench.rs   # Performance benchmark
+│   │   │       └── stress.rs  # Stress test (20 concurrent sessions)
+│   │   ├── tests/
+│   │   │   └── parity.rs
+│   │   ├── migrations/        # SQL migration files
+│   │   └── index.html         # HTML frontend fallback (embedded at compile)
+│   │
+│   └── frontend/              # egui WASM UI (trunk build)
+│       ├── Cargo.toml
+│       ├── index.html
+│       └── src/
+│           └── main.rs        # egui app: terminal list, output, input, WS
 │
-├── Makefile                   # Unified build/run/test/bench/clean
-├── README.md                  # Project overview + quick start
-└── spec.md                    # This file
+├── test.mjs                   # Web integration tests
+├── test.md
+└── .gitignore
 ```
 
 ---
@@ -521,35 +517,24 @@ Env variable names are validated: must match `^[A-Za-z_][A-Za-z0-9_]*$`.
 
 ## Install & Usage
 
-### Python
-
-```bash
-cd python && pip install -e .
-i4z-terminal-mcp                           # random port
-I4Z_TERMINAL_WEB_PORT=8080 i4z-terminal-mcp  # fixed port
-```
-
 ### Rust
 
 ```bash
-cd rust && cargo build --release
+cargo build --release -p i4z-terminal-mcp
 ./target/release/i4z-terminal-mcp         # random port
-I4Z_TERMINAL_WEB_PORT=8080 cargo run --release --bin i4z-terminal-mcp
+I4Z_TERMINAL_WEB_PORT=8080 cargo run --release -p i4z-terminal-mcp
 ```
 
 ### Makefile (from project root)
 
 ```bash
-make install         # pip install python/
-make run             # run Python MCP server
-make build           # cargo build (debug)
-make run-rust        # cargo build + run Rust MCP server
+make rs-build        # cargo build (debug)
+make rs-run          # cargo run (debug)
 make test            # cargo test
 make bench           # Rust benchmark
 make stress          # Rust stress test (20 sessions)
-make inspect         # MCP Inspector (Python)
-make inspect-rust    # MCP Inspector (Rust)
-make clean           # clean all build artifacts
+make inspect-rust    # MCP Inspector (Rust, local binary)
+make clean           # clean build artifacts
 ```
 
 ### With OpenCode

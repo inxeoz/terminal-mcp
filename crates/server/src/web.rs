@@ -1,6 +1,8 @@
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use actix_cors::Cors;
+use actix_files::Files;
 use actix_web::{web, App, HttpRequest, HttpResponse, HttpServer, Responder};
 use actix_ws::Message;
 use serde::Deserialize;
@@ -590,10 +592,54 @@ async fn ws_terminal(
     Ok(response)
 }
 
+// ── frontend resolution ────────────────────────────────────────────────────────
+
+fn resolve_frontend_dir() -> Option<PathBuf> {
+    if let Ok(dir) = std::env::var("I4Z_TERMINAL_FRONTEND_DIR") {
+        let p = PathBuf::from(dir);
+        if p.join("index.html").exists() {
+            return Some(p);
+        }
+    }
+    // With the workspace layout, try relative to CWD first
+    let candidates = [
+        std::env::current_dir().ok()?.join("crates/frontend/dist"),
+        // From binary in target/release/, go up to workspace root
+        std::env::current_exe().ok()?.parent()?.join("../../crates/frontend/dist"),
+    ];
+    for c in &candidates {
+        if c.join("index.html").exists() {
+            return Some(c.clone());
+        }
+    }
+    None
+}
+
+async fn frontend_index(frontend: web::Data<Option<PathBuf>>) -> impl Responder {
+    if let Some(dir) = &**frontend {
+        if let Ok(html) = std::fs::read_to_string(dir.join("index.html")) {
+            return HttpResponse::Ok().content_type("text/html; charset=utf-8").body(html);
+        }
+    }
+    HttpResponse::Ok().content_type("text/html; charset=utf-8").body(HTML)
+}
+
 // ── app factory ───────────────────────────────────────────────────────────────
 
 pub async fn run(manager: Arc<Manager>, host: &str, port: u16) -> std::io::Result<()> {
     let data = web::Data::new(manager);
+
+    let frontend_dir = resolve_frontend_dir();
+    let pkg_dir = frontend_dir.as_ref().map(|d| d.join("pkg")).filter(|p| p.exists());
+    let has_frontend = frontend_dir.is_some();
+    let frontend = web::Data::new(frontend_dir);
+
+    if has_frontend {
+        eprintln!("  Frontend: egui WASM (trunk build)");
+    } else {
+        eprintln!("  Frontend: embedded HTML (no egui WASM found)");
+        eprintln!("  → Build with: cd frontend && trunk build --release");
+    }
 
     HttpServer::new(move || {
         let cors = Cors::default()
@@ -601,9 +647,10 @@ pub async fn run(manager: Arc<Manager>, host: &str, port: u16) -> std::io::Resul
             .allow_any_method()
             .allow_any_header()
             .max_age(3600);
-        App::new()
+        let mut app = App::new()
             .wrap(cors)
             .app_data(data.clone())
+            .app_data(frontend.clone())
             .app_data(web::JsonConfig::default().error_handler(|e, _| {
                 let msg = e.to_string();
                 actix_web::error::InternalError::from_response(
@@ -612,7 +659,7 @@ pub async fn run(manager: Arc<Manager>, host: &str, port: u16) -> std::io::Resul
                 )
                 .into()
             }))
-            .route("/", web::get().to(index))
+            // API routes (matched before catch-all /)
             .route("/api/terminals", web::get().to(api_terminals))
             .route("/api/create", web::post().to(api_create))
             .route("/api/health", web::get().to(api_health))
@@ -646,7 +693,18 @@ pub async fn run(manager: Arc<Manager>, host: &str, port: u16) -> std::io::Resul
             .route("/api/import", web::post().to(api_import))
             .route("/api/config", web::get().to(api_config_get))
             .route("/api/config", web::post().to(api_config_update))
-            .route("/ws/{id}", web::get().to(ws_terminal))
+            .route("/ws/{id}", web::get().to(ws_terminal));
+
+        // Frontend routes
+        if let Some(ref pkg) = pkg_dir {
+            app = app
+                .route("/", web::get().to(frontend_index))
+                .service(Files::new("/pkg", pkg.clone()));
+        } else {
+            app = app.route("/", web::get().to(index));
+        }
+
+        app
     })
     .bind((host, port))?
     .run()

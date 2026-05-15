@@ -8,6 +8,7 @@ repository = "https://github.com/inxeoz/terminal-mcp"
 readme = "README.md"
 keywords = ["mcp", "terminal", "pty", "shell", "ai"]
 categories = ["command-line-utilities", "development-tools"]
+default-run = "i4z-terminal-mcp"
 
 [[bin]]
 name = "i4z-terminal-mcp"
@@ -41,6 +42,7 @@ libc = "0.2"
 actix-web = "4"
 actix-ws = "0.4"
 actix-cors = "0.7"
+actix-files = "0.6"
 
 # Database (async SQLite)
 sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio", "macros"] }

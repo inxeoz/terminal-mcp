@@ -114,12 +114,12 @@ sequenceDiagram
 ### Running
 
 ```bash
-# Debug build
-cd rust && cargo run
+# Debug build (from workspace root)
+cargo run -p i4z-terminal-mcp
 
 # Release build (recommended)
-cd rust && cargo build --release
-./rust/target/release/i4z-terminal-mcp
+cargo build --release -p i4z-terminal-mcp
+./target/release/i4z-terminal-mcp
 ```
 
 ### Configuration
